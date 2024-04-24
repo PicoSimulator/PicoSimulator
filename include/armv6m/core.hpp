@@ -1,0 +1,148 @@
+#pragma once
+
+#include "memory_device.hpp"
+#include "clock.hpp"
+#include "reset.hpp"
+#include "async.hpp"
+#include "bus.hpp"
+
+#include <coroutine>
+#include <utility>
+#include <string>
+
+namespace ARMv6M{
+
+  class ARMv6MCore final : public IClockable, public IResettable{
+  public:
+    ARMv6MCore(IAsyncReadWritePort<uint32_t> &bus, std::string name) 
+    : m_mpu_bus_interface{bus, *this}
+    , m_ppb{*this}
+    , m_core_task{core_task()}
+    , m_name{std::move(name)}
+    {
+
+    }
+    void tick() override;
+    virtual void reset() override;
+    BusMaster *run() { return &m_core_task; }
+  protected:
+  private:
+    int instruction_count = 0;
+
+    void set_PC(uint32_t addr) { m_regs[15] = addr; }
+    uint32_t &PC() { return m_regs[15]; }
+    uint32_t &LR() { return m_regs[14]; }
+    uint32_t &SP() { return m_regs[13]; }
+    uint32_t XPSR() const { return m_APSR | m_IPSR | m_EPSR; }
+    void set_reg(int reg, uint32_t val) { m_regs[reg] = val; }
+    uint32_t get_reg(int reg) { return m_regs[reg]; }
+    bool T() { return m_regs[15] & 1; }
+
+    uint32_t instr_addr() { return PC() & ~1; }
+
+    Awaitable<void> exec_instr(uint32_t instr);
+
+
+
+    uint32_t m_regs[16];
+    uint32_t m_nextPC;
+    uint32_t m_MSP, m_PSP;
+    uint32_t m_APSR;
+    uint32_t m_IPSR;
+    uint32_t m_EPSR;
+    uint32_t m_PRIMASK;
+    uint32_t m_CONTROL;
+    enum CONTROL{
+      nPRIV = 1 << 0,
+      SPSEL = 1 << 1,
+    };
+    enum APSR{
+      OVERFLOW = 1<<28,
+      CARRY = 1<<29,
+      ZERO = 1<<30,
+      NEGATIVE = 1<<31,
+    };
+    bool m_threadMode;
+    IAsyncReadWritePort<uint32_t> &m_bus_interface = m_mpu_bus_interface;
+
+    enum Cond{
+      EQ = 0b0000,
+      NE = 0b0001,
+      CS = 0b0010,
+      CC = 0b0011,
+      MI = 0b0100,
+      PL = 0b0101,
+      VS = 0b0110,
+      VC = 0b0111,
+      HI = 0b1000,
+      LS = 0b1001,
+      GE = 0b1010,
+      LT = 0b1011,
+      GT = 0b1100,
+      LE = 0b1101,
+    };
+
+    enum class ExceptionType{
+      Reset = 1,
+      NMI = 2,
+      HardFault = 3,
+      SVC = 11,
+      PendSV = 14,
+      SysTick = 15,
+    };
+    uint32_t ReturnAddress(ExceptionType type){
+      switch(type){
+        case ExceptionType::Reset: return 0;
+        case ExceptionType::NMI: return 0;
+        case ExceptionType::HardFault: return 0;
+        case ExceptionType::SVC: return 0;
+        case ExceptionType::PendSV: return 0;
+        case ExceptionType::SysTick: return 0;
+      }
+    }
+
+    auto next_tick(){
+      m_waiting_for_tick = true;
+      return std::suspend_always{};
+    }
+    BusMaster core_task();
+    BusMaster m_core_task;
+    bool m_waiting_for_tick = true;
+    bool m_in_reset = false;
+
+    class MPU final : public IAsyncReadWritePort<uint32_t>{
+    public:
+      MPU(IAsyncReadWritePort<uint32_t> &bus, ARMv6MCore &core);
+      virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
+      virtual Awaitable<uint16_t> read_halfword(uint32_t addr) override;
+      virtual Awaitable<uint32_t> read_word(uint32_t addr) override;
+      virtual Awaitable<void> write_byte(uint32_t addr, uint8_t in) override;
+      virtual Awaitable<void> write_halfword(uint32_t addr, uint16_t in) override;
+      virtual Awaitable<void> write_word(uint32_t addr, uint32_t in) override;
+    protected:
+    private:
+      IAsyncReadWritePort<uint32_t> &m_bus_interface;
+      ARMv6MCore &m_core;
+    };
+
+    class PPB final : public IReadWritePort<uint32_t>{
+    public:
+      PPB(ARMv6MCore &core) : m_core{core} {}
+      virtual PortState read_byte(uint32_t addr, uint8_t &out) override;
+      virtual PortState read_halfword(uint32_t addr, uint16_t &out) override;
+      virtual PortState read_word(uint32_t addr, uint32_t &out) override;
+      virtual PortState write_byte(uint32_t addr, uint8_t in) override;
+      virtual PortState write_halfword(uint32_t addr, uint16_t in) override;
+      virtual PortState write_word(uint32_t addr, uint32_t in) override;
+    protected:
+    private:
+      ARMv6MCore &m_core;
+    };
+
+    MPU m_mpu_bus_interface;
+    PPB m_ppb;
+    const std::string m_name;
+  };
+
+
+}
