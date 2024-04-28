@@ -239,25 +239,28 @@ Awaitable<uint32_t> RP2040::RP2040::CoreBus::read_word(uint32_t addr)
 
 Awaitable<void> RP2040::RP2040::CoreBus::write_byte(uint32_t addr, uint8_t val)
 {
-  if (addr & 0xf000'0000 == 0xd000'0000) {
+  if ((addr & 0xf000'0000) == 0xd000'0000) {
     m_ioport.write_byte(addr, val);
+  } else {
+    co_await m_ahb.write_byte(addr, val);
   }
-  co_await m_ahb.write_byte(addr, val);
 }
 Awaitable<void> RP2040::RP2040::CoreBus::write_halfword(uint32_t addr, uint16_t val)
 {
-  if (addr & 0xf000'0000 == 0xd000'0000) {
+  if ((addr & 0xf000'0000) == 0xd000'0000) {
     m_ioport.write_halfword(addr, val);
+  } else {
+    co_await m_ahb.write_halfword(addr, val);
   }
-  co_await m_ahb.write_halfword(addr, val);
 }
 Awaitable<void> RP2040::RP2040::CoreBus::write_word(uint32_t addr, uint32_t val)
 {
   // std::cout << "CoreBus::write_word " << std::hex << addr << std::dec << "\n";
-  if (addr & 0xf000'0000 == 0xd000'0000) {
+  if ((addr & 0xf000'0000) == 0xd000'0000) {
     m_ioport.write_word(addr, val);
+  } else {
+    co_await m_ahb.write_word(addr, val);
   }
-  co_await m_ahb.write_word(addr, val);
 }
 
 void RP2040::RP2040::AHB::tick()
@@ -282,6 +285,9 @@ PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){
     case 0xd000'0050: out = m_tx_fifo.status_send() | m_rx_fifo.status_recv(); break;
     // case 0xd000'0054: out = ; break;
     case 0xd000'0058: out = m_rx_fifo.recv(); break;
+    case 0xd000'0070: out = m_divider.get_quotient(); break;
+    case 0xd000'0074: out = m_divider.get_remainder(); break;
+    case 0xd000'0078: out = m_divider.get_status(); break;
     default: throw ARMv6M::BusFault{addr};
   }
   return PortState::SUCCESS; 
@@ -297,6 +303,10 @@ PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){
       if (in & (1<<3)) m_rx_fifo.clear_recv();
       break;
     case 0xd000'0054: m_tx_fifo.send(in); break;
+    case 0xd000'0060: m_divider.set_udividend(in); break;
+    case 0xd000'0064: m_divider.set_udivisor(in); break;
+    case 0xd000'0068: m_divider.set_sdividend(in); break;
+    case 0xd000'006c: m_divider.set_sdivisor(in); break;
     default: throw ARMv6M::BusFault{addr};
   }
   return PortState::SUCCESS; 
