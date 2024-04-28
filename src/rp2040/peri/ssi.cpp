@@ -24,12 +24,13 @@ void SSI::tick()
 PortState SSI::read_word_internal(uint32_t addr, uint32_t &out)
 {
   switch(addr & 0xfc) {
-    case 0x00: out = m_ctrlr0; break;
-    case 0x04: out = m_ctrlr1; break;
-    case 0x20: out = m_tx_fifo.count(); break;
-    case 0x24: out = m_rx_fifo.count(); break;
-    case 0x60: out = m_rx_fifo.pop(); break;
-    case 0xf4: out = m_spi_ctrlr0; break;
+    case RegOffset::CTRLR0: out = m_ctrlr0; break;
+    case RegOffset::CTRLR1: out = m_ctrlr1; break;
+    case RegOffset::TXFLR: out = m_tx_fifo.count(); break;
+    case RegOffset::RXFLR: out = m_rx_fifo.count(); break;
+    case RegOffset::SR: out = 0x0000'0004; break;
+    case RegOffset::DR0: out = m_rx_fifo.pop(); break;
+    case RegOffset::SPI_CTRLR0: out = m_spi_ctrlr0; break;
     default: return PortState::FAULT;
   }
   return PortState::SUCCESS;
@@ -38,10 +39,10 @@ PortState SSI::read_word_internal(uint32_t addr, uint32_t &out)
 PortState SSI::write_word_internal(uint32_t addr, uint32_t in)
 {
   switch(addr & 0xfc) {
-    case 0x00: m_ctrlr0 = in; break;
-    case 0x04: m_ctrlr1 = in; break;
-    case 0x60: m_tx_fifo.push(in); break;
-    case 0xf4: m_spi_ctrlr0 = in; break;
+    case RegOffset::CTRLR0: m_ctrlr0 = in; break;
+    case RegOffset::CTRLR1: m_ctrlr1 = in; break;
+    case RegOffset::DR0: m_tx_fifo.push(in); break;
+    case RegOffset::SPI_CTRLR0: m_spi_ctrlr0 = in; break;
     default: return PortState::FAULT;
   }
   return PortState::SUCCESS;

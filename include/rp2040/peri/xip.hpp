@@ -9,11 +9,25 @@
 #include "clock.hpp"
 #include "fifo.hpp"
 #include "rp2040/peri/ssi.hpp"
+#include <fstream>
 
 namespace RP2040{
   class XIP final : public IAsyncReadWritePort<uint32_t>, public IClockable{
   public:
-    XIP(SSI &ssi) : m_ssi{ssi} {}
+    XIP(SSI &ssi) : m_ssi{ssi} {
+      std::ifstream file("/home/skyler/git/raspberrypi/pico-examples/build/hello_world/serial/hello_serial.bin", std::ios::binary | std::ios::ate);
+      std::streamsize size = file.tellg();
+      file.seekg(0, std::ios::beg);
+
+      if (file.read((char*)m_flash.begin(), size))
+      {
+          /* worked! */
+      } else {
+          /* failed! */
+          std::terminate();
+      }
+
+    }
     virtual void tick() override;
     virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
     virtual Awaitable<uint16_t> read_halfword(uint32_t addr) override;

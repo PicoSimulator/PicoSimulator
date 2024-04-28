@@ -55,6 +55,37 @@ namespace RP2040{
 
 
     SPIDev *m_spidev;
+
+    enum RegOffset{
+      CTRLR0 = 0x00,
+      CTRLR1 = 0x04,
+      SSIENR = 0x08,
+      MWCR = 0x0c,
+      SER = 0x10,
+      BAUDR = 0x14,
+      TXFTLR = 0x18,
+      RXFTLR = 0x1c,
+      TXFLR = 0x20,
+      RXFLR = 0x24,
+      SR = 0x28,
+      IMR = 0x2c,
+      ISR = 0x30,
+      RISR = 0x34,
+      TXOICR = 0x38,
+      RXOICR = 0x3c,
+      RXUICR = 0x40,
+      MSTICR = 0x44,
+      ICR = 0x48,
+      DMACR = 0x4c,
+      DMATDLR = 0x50,
+      DMARDLR = 0x54,
+      IDR = 0x58,
+      SSI_VERSION_ID = 0x5c,
+      DR0 = 0x60,
+      RX_SAMPLE_DLY = 0xf0,
+      SPI_CTRLR0 = 0xf4,
+      TXD_DRIVE_EDGE = 0xf8,
+    };
   };
 
   class SSIFiFoAux : public IPeripheralPort{

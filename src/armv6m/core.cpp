@@ -107,7 +107,7 @@ BusMaster ARMv6MCore::core_task()
         // decode
         // execute
         // writeback
-        if (m_name == "core-0" && m_tickcnt > 10460)
+        // if (m_name == "core-0" && m_tickcnt > 10460)
           dump();
       } catch (ARMv6M::HardFault fault) {
         std::cout << "Hardfault on instruction fetch" << std::endl;
@@ -764,7 +764,6 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     uint32_t Rn = (opcode >> 24) & 0x7;\
     uint32_t reg_list = (opcode >> 16) & 0xff;\
     bool wback = (reg_list & (1<<Rn)) == 0;\
-    reg_list &= ~(1<<Rn);\
     uint32_t Rn_val = get_reg(Rn);\
     std::cout << "LDM R" << Rn << (wback?" {":"! {") << std::bitset<8>{reg_list} << "}" << std::endl;\
     for (int i = 0; i < 8; i++) {\
@@ -785,62 +784,49 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     switch (cond) {\
       case Cond::EQ: \
         jump = (m_APSR & APSR::ZERO); \
-        std::cout << "BEQ " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BEQ "; break;\
       case Cond::NE: \
         jump = !(m_APSR & APSR::ZERO); \
-        std::cout << "BNE " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BNE "; break;\
       case Cond::CS: \
         jump = (m_APSR & APSR::CARRY); \
-        std::cout << "BCS " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BCS "; break;\
       case Cond::CC: \
         jump = !(m_APSR & APSR::CARRY); \
-        std::cout << "BCC " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BCC "; break;\
       case Cond::MI: \
         jump = (m_APSR & APSR::NEGATIVE); \
-        std::cout << "BMI " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BMI "; break;\
       case Cond::PL: \
         jump = !(m_APSR & APSR::NEGATIVE); \
-        std::cout << "BPL " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BPL "; break;\
       case Cond::VS: \
         jump = (m_APSR & APSR::OVERFLOW); \
-        std::cout << "BVS " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BVS "; break;\
       case Cond::VC: \
         jump = !(m_APSR & APSR::OVERFLOW); \
-        std::cout << "BVC " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BVC "; break;\
       case Cond::HI: \
         jump = ((m_APSR & APSR::CARRY) && !(m_APSR & APSR::ZERO)); \
-        std::cout << "BHI " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BHI "; break;\
       case Cond::LS: \
         jump = (!(m_APSR & APSR::CARRY) || (m_APSR & APSR::ZERO)); \
-        std::cout << "BLS " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BLS "; break;\
       case Cond::GE: \
         jump = (!!(m_APSR & APSR::NEGATIVE) == !!(m_APSR & APSR::OVERFLOW)); \
-        std::cout << "BGE " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BGE "; break;\
       case Cond::LT: \
         jump = (!!(m_APSR & APSR::NEGATIVE) != !!(m_APSR & APSR::OVERFLOW)); \
-        std::cout << "BLT " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BLT "; break;\
       case Cond::GT: \
         jump = (!(m_APSR & APSR::ZERO) && (!!(m_APSR & APSR::NEGATIVE) == !!(m_APSR & APSR::OVERFLOW))); \
-        std::cout << "BGT " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BGT "; break;\
       case Cond::LE: \
         jump = ((m_APSR & APSR::ZERO) && (!!(m_APSR & APSR::NEGATIVE) != !!(m_APSR & APSR::OVERFLOW))); \
-        std::cout << "BLE " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
-        break;\
+        std::cout << "BLE "; break;\
       default: throw HardFault{"unrecognised branch instr"}; \
     }\
+    std::cout << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
     if (jump) { \
       m_nextPC = addr; /*This isn't right!*/ \
     } \
@@ -855,32 +841,68 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     m_nextPC = addr; \
   }
 
+#define OPCODE_1111_001_mov_spec(opcode) \
+  {\
+    uint32_t sysm = opcode & 0xff;\
+    uint32_t Rd = (opcode >> 8) & 0xf;\
+    uint32_t Rn = (opcode >> 16) & 0xf;\
+    switch(opcode & 0x07e0'0000){\
+      case 0x0380'0000: /*MSR*/ \
+      {\
+        switch(sysm){\
+          case 0x04:\
+          case 0x05:\
+          case 0x06:\
+            m_APSR = get_reg(Rn) & 0xf800'0000;\
+            break;\
+          case 0x08: \
+          if (CurrentModeIsPrivileged()) {\
+            set_MSP(get_reg(Rn) & ~0x3); \
+          } break; \
+          case 0x09: \
+          if (CurrentModeIsPrivileged()) {\
+            set_PSP(get_reg(Rn) & ~0x3); \
+          } break; \
+        }\
+      }\
+      case 0x03e0'0000: ;/*MRS*/ \
+    }\
+  }
+
 #define OPCODE_1111_01x_bl(opcode) \
   { \
-    uint8_t cond = (opcode >> 24) & 0xf; \
-    uint32_t imm11 = (opcode) & 0x7ff; \
-    uint32_t imm10 = (opcode >> 16) & 0x3ff; \
-    uint32_t I1 = (opcode >> 13) &1;\
-    uint32_t I2 = (opcode >> 11) &1;\
-    uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23)) - (1<<24);\
-    uint32_t addr = m_nextPC + imm32;\
-    std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
-    LR() = m_nextPC;\
-    m_nextPC = addr;\
+    if ((opcode & 0x0000'5000) == 0x0000'0000) {\
+      OPCODE_1111_001_mov_spec(opcode)\
+    } else {\
+      uint8_t cond = (opcode >> 24) & 0xf; \
+      uint32_t imm11 = (opcode) & 0x7ff; \
+      uint32_t imm10 = (opcode >> 16) & 0x3ff; \
+      uint32_t I1 = (opcode >> 13) &1;\
+      uint32_t I2 = (opcode >> 11) &1;\
+      uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23)) - (1<<24);\
+      uint32_t addr = m_nextPC + imm32;\
+      std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
+      LR() = m_nextPC;\
+      m_nextPC = addr;\
+    }\
   }
 
 #define OPCODE_1111_00x_bl(opcode) \
   { \
-    uint8_t cond = (opcode >> 24) & 0xf; \
-    uint32_t imm11 = (opcode) & 0x7ff; \
-    uint32_t imm10 = (opcode >> 16) & 0x3ff; \
-    uint32_t I1 = 1^((opcode >> 13) &1);\
-    uint32_t I2 = 1^((opcode >> 11) &1);\
-    uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23));\
-    uint32_t addr = m_nextPC + imm32;\
-    std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
-    LR() = m_nextPC;\
-    m_nextPC = addr;\
+    if ((opcode & 0x0000'5000) == 0x0000'0000) {\
+      OPCODE_1111_001_mov_spec(opcode)\
+    } else {\
+      uint8_t cond = (opcode >> 24) & 0xf; \
+      uint32_t imm11 = (opcode) & 0x7ff; \
+      uint32_t imm10 = (opcode >> 16) & 0x3ff; \
+      uint32_t I1 = 1^((opcode >> 13) &1);\
+      uint32_t I2 = 1^((opcode >> 11) &1);\
+      uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23));\
+      uint32_t addr = m_nextPC + imm32;\
+      std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
+      LR() = m_nextPC;\
+      m_nextPC = addr;\
+    }\
   }
 
 #define ENUM_OPCODES(o) \

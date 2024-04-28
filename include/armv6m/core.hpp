@@ -45,6 +45,16 @@ namespace ARMv6M{
 
     Awaitable<void> exec_instr(uint32_t instr);
 
+    bool CurrentModeIsPrivileged() const { return !m_threadMode || !(m_CONTROL & CONTROL::nPRIV); }
+    void set_MSP(uint32_t val) { m_MSP = val; SP() = val; }
+    void set_PSP(uint32_t val) { m_PSP = val; }
+
+    // enum ProcessorMode{
+    //   ThreadMode = 0b10000,
+    //   HandlerMode = 0b11011,
+    //   ModeMask = 0b11111,
+    // };
+
 
     uint64_t m_tickcnt = 0;
     uint32_t m_regs[16];

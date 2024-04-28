@@ -147,7 +147,7 @@ Awaitable<uint32_t> RP2040::RP2040::AHB::read_word(uint32_t addr)
     case BusDevice::XIP: out = co_await m_rp2040.m_XIP.read_word(addr); break;
     default: throw ARMv6M::BusFault{};
   }
-  // std::cout << "read_word(" << std::hex << addr << std::dec << ") completed" << std::endl;
+  std::cout << "read_word(" << std::hex << addr << std::dec << ") completed " << out << std::endl;
   co_return out;
 }
 

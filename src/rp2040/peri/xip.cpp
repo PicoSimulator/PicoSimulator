@@ -19,7 +19,13 @@ Awaitable<uint8_t> XIP::read_byte(uint32_t addr)
 
 Awaitable<uint16_t> XIP::read_halfword(uint32_t addr) 
 {
-  throw ARMv6M::UnimplementedFault{"XIP::read_halfword"};
+  switch(addr&0x0f00'0000) {
+    case 0x0000'0000:
+    case 0x0100'0000:
+    case 0x0200'0000:
+    case 0x0300'0000:
+      co_return ((uint16_t*)m_flash.begin())[(addr&0x00ff'ffff)/2];
+  }
 }
 
 Awaitable<uint32_t> XIP::read_word(uint32_t addr) 
@@ -29,7 +35,7 @@ Awaitable<uint32_t> XIP::read_word(uint32_t addr)
     case 0x0100'0000:
     case 0x0200'0000:
     case 0x0300'0000:
-      co_return m_flash[addr&0x00ff'ffff];
+      co_return ((uint32_t*)m_flash.begin())[(addr&0x00ff'ffff)/4];
     case 0x0400'0000:
     {
       switch(addr & 0x0000'3fff) {
