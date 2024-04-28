@@ -10,6 +10,7 @@
 #include "rp2040/peri/pads_qspi.hpp"
 #include "rp2040/peri/watchdog.hpp"
 #include "rp2040/peri/tbman.hpp"
+#include "rp2040/peri/xosc.hpp"
 
 namespace RP2040{
 
@@ -55,5 +56,6 @@ namespace RP2040{
     TBMan m_tbman;
     IOQSPI m_io_qspi;
     PadsQSPI m_pads_qspi;
+    XOSC m_xosc;
   };
 }

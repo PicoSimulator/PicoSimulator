@@ -2,15 +2,15 @@
 
 #include "rp2040/peripheral.hpp"
 
-class Clocks final : public IPeripheralPort{
+class XOSC final : public IPeripheralPort{
 public:
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
     out = 0;
-    switch(addr & 0xfc) {
-      case 0x38: out = 1; break; // CLK_REF_SELECTED
-      case 0x44: out = 1; break; // CLK_SYS_SELECTED
+    switch(addr & 0xff) {
+      case 0x00: out = 0x00d1'eaa0; break; // xosc disabled?
+      case 0x04: out = 0x8000'0000; break; // fake oscillator stable
     }
     return PortState::SUCCESS;
   }
