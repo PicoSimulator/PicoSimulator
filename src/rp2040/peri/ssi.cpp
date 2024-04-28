@@ -1,0 +1,61 @@
+#include "rp2040/peri/ssi.hpp"
+
+using namespace RP2040;
+
+void SSI::tick()
+{
+  // if(m_rp2040.m_clocks.ssi_enabled()) {
+  //   if(m_rp2040.m_clocks.ssi_tx_fifo_enabled()) {
+  //     if(m_rp2040.m_clocks.ssi_tx_fifo_level() > 0) {
+  //       m_rp2040.m_io_qspi.write_word(0, m_tx_fifo.pop());
+  //     }
+  //   }
+  //   if(m_rp2040.m_clocks.ssi_rx_fifo_enabled()) {
+  //     if(m_rp2040.m_clocks.ssi_rx_fifo_level() < 16) {
+  //       m_rx_fifo.push(m_rp2040.m_io_qspi.read_word(0));
+  //     }
+  //   }
+  // }
+  if ((m_ctrlr0 & 0x000f'f000) == 0x0007'0000 && m_tx_fifo.count() > 0 && !m_rx_fifo.full() && m_spidev) {
+    m_rx_fifo.push(m_spidev->spi_exchange_byte(m_tx_fifo.pop()));
+  }
+}
+
+PortState SSI::read_word_internal(uint32_t addr, uint32_t &out)
+{
+  switch(addr & 0xfc) {
+    case 0x00: out = m_ctrlr0; break;
+    case 0x04: out = m_ctrlr1; break;
+    case 0x20: out = m_tx_fifo.count(); break;
+    case 0x24: out = m_rx_fifo.count(); break;
+    case 0x60: out = m_rx_fifo.pop(); break;
+    case 0xf4: out = m_spi_ctrlr0; break;
+    default: return PortState::FAULT;
+  }
+  return PortState::SUCCESS;
+}
+
+PortState SSI::write_word_internal(uint32_t addr, uint32_t in)
+{
+  switch(addr & 0xfc) {
+    case 0x00: m_ctrlr0 = in; break;
+    case 0x04: m_ctrlr1 = in; break;
+    case 0x60: m_tx_fifo.push(in); break;
+    case 0xf4: m_spi_ctrlr0 = in; break;
+    default: return PortState::FAULT;
+  }
+  return PortState::SUCCESS;
+}
+
+PortState SSI::xor_word_internal(uint32_t addr, uint32_t in)
+{
+  return PortState::FAULT;
+}
+PortState SSI::set_bits_word_internal(uint32_t addr, uint32_t in)
+{
+  return PortState::FAULT;
+}
+PortState SSI::clear_bits_word_internal(uint32_t addr, uint32_t in)
+{
+  return PortState::FAULT;
+}

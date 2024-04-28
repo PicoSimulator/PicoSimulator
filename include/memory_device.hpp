@@ -67,4 +67,13 @@ private:
 template<class Addr>
 class IAsyncReadWritePort : public IAsyncReadPort<Addr>, public IAsyncWritePort<Addr>{};
 
+// template<class Addr>
+// class AsyncWriteAdapter : public IWritePort<Addr>, public IAsyncReadWritePort<Addr>{
+// public:
+//   virtual Awaitable<void> write_byte(Addr addr, uint8_t in) override final
+//   {
+//     co_return (addr, in);
+//   }
+// };
+
 using IMemoryDevice = IReadWritePort<uint32_t>;

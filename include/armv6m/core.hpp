@@ -33,17 +33,20 @@ namespace ARMv6M{
     uint32_t &PC() { return m_regs[15]; }
     uint32_t &LR() { return m_regs[14]; }
     uint32_t &SP() { return m_regs[13]; }
+    const uint32_t &PC() const { return m_regs[15]; }
+    const uint32_t &LR() const { return m_regs[14]; }
+    const uint32_t &SP() const { return m_regs[13]; }
     uint32_t XPSR() const { return m_APSR | m_IPSR | m_EPSR; }
     void set_reg(int reg, uint32_t val) { m_regs[reg] = val; }
-    uint32_t get_reg(int reg) { return m_regs[reg]; }
-    bool T() { return m_regs[15] & 1; }
+    uint32_t get_reg(int reg) const { return m_regs[reg]; }
+    bool T() const { return m_regs[15] & 1; }
 
-    uint32_t instr_addr() { return PC() & ~1; }
+    uint32_t instr_addr() const { return PC() & ~1; }
 
     Awaitable<void> exec_instr(uint32_t instr);
 
 
-
+    uint64_t m_tickcnt = 0;
     uint32_t m_regs[16];
     uint32_t m_nextPC;
     uint32_t m_MSP, m_PSP;
@@ -105,6 +108,7 @@ namespace ARMv6M{
       m_waiting_for_tick = true;
       return std::suspend_always{};
     }
+    void dump() const;
     BusMaster core_task();
     BusMaster m_core_task;
     bool m_waiting_for_tick = true;

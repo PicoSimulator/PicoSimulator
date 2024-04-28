@@ -1,6 +1,6 @@
 #include "rp2040.hpp"
 
-RP2040 g_rp2040{};
+RP2040::RP2040 g_rp2040{};
 
 int main(int argc, char** argv)
 {

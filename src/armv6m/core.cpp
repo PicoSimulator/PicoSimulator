@@ -18,6 +18,7 @@ void ARMv6MCore::tick()
     m_waiting_for_tick = false;
     m_core_task.resume();
   }
+  m_tickcnt++;
 }
 
 void ARMv6MCore::reset()
@@ -25,10 +26,25 @@ void ARMv6MCore::reset()
   m_in_reset = true;
 }
 
+void ARMv6MCore::dump() const
+{
+  for (int i = 0; i < 12; i++) {
+    std::cout << "R" << std::setfill(' ') << std::setw(2) << std::left << i << "  " << std::hex << std::setw(8) << std::right << std::setfill(' ') << m_regs[i] << std::dec << std::endl;
+  }
+  std::cout << "SP   " << std::hex << std::setw(8) << std::right << std::setfill(' ') << SP() << std::dec << std::endl;
+  std::cout << "MSP  " << std::hex << std::setw(8) << std::right << std::setfill(' ') << m_MSP << std::dec << std::endl;
+  std::cout << "PSP  " << std::hex << std::setw(8) << std::right << std::setfill(' ') << m_PSP << std::dec << std::endl;
+  std::cout << "LR   " << std::hex << std::setw(8) << std::right << std::setfill(' ') << LR() << std::dec << std::endl;
+  std::cout << "PC   " << std::hex << std::setw(8) << std::right << std::setfill(' ') << PC() << std::dec << std::endl;
+
+  std::cout << "APSR " << std::bitset<32>{m_APSR} << std::endl;
+  std::cout << "     NZCV" << std::endl;
+}
+
 BusMaster ARMv6MCore::core_task()
 {
   while(true){
-    // VTOR = zeroes(32)  
+    // VTOR = zeroes(32)
     for (int i = 0; i < 12; i++) {
       m_regs[i] = 0; // do we actually do this?
     }
@@ -62,11 +78,11 @@ BusMaster ARMv6MCore::core_task()
         if (!T())
         {
           // std::cout << "fetching arm" << std::endl;
-          throw HardFault{}; //ARMv6M does not support ARM mode
+          throw HardFault{"ARM mode not supported!"}; //ARMv6M does not support ARM mode
           instr = co_await m_mpu_bus_interface.read_word(instr_addr());
           instr_incr = 4;
-        } 
-        else 
+        }
+        else
         {
           // std::cout << "fetch thumb" << std::endl;
           instr = co_await m_mpu_bus_interface.read_halfword(instr_addr()) << 16;
@@ -91,21 +107,15 @@ BusMaster ARMv6MCore::core_task()
         // decode
         // execute
         // writeback
+        if (m_name == "core-0" && m_tickcnt > 10460)
+          dump();
       } catch (ARMv6M::HardFault fault) {
         std::cout << "Hardfault on instruction fetch" << std::endl;
-        for (int i = 0; i < 12; i++) {
-          std::cout << "R" << std::setfill(' ') << std::setw(2) << std::left << i << "  " << std::hex << std::setw(8) << std::right << std::setfill(' ') << m_regs[i] << std::dec << std::endl; 
-        }
-        std::cout << "SP   " << std::hex << std::setw(8) << std::right << std::setfill(' ') << SP() << std::dec << std::endl; 
-        std::cout << "MSP  " << std::hex << std::setw(8) << std::right << std::setfill(' ') << m_MSP << std::dec << std::endl; 
-        std::cout << "PSP  " << std::hex << std::setw(8) << std::right << std::setfill(' ') << m_PSP << std::dec << std::endl; 
-        std::cout << "LR   " << std::hex << std::setw(8) << std::right << std::setfill(' ') << LR() << std::dec << std::endl; 
-        std::cout << "PC   " << std::hex << std::setw(8) << std::right << std::setfill(' ') << PC() << std::dec << std::endl; 
-
-        std::cout << "APSR " << std::bitset<32>{m_APSR} << std::endl;
-        std::cout << "     NZCV" << std::endl;
+        dump();
+        // std::flush();
 
         std::terminate();
+        // std::exit(-1);
         // Exception Entry!
         R"____(
             // ExceptionEntry()
@@ -192,7 +202,7 @@ BusMaster ARMv6MCore::core_task()
           m_MSP -= 0x20;
           m_MSP &= ~0x100;
           frameptr = m_MSP;
-        } 
+        }
         m_bus_interface.write_word(frameptr, m_regs[0]);
         m_bus_interface.write_word(frameptr + 0x4, m_regs[1]);
         m_bus_interface.write_word(frameptr + 0x8, m_regs[2]);
@@ -211,7 +221,7 @@ BusMaster ARMv6MCore::core_task()
           }
         }
 
-      } 
+      }
       co_await next_tick();
     }
   }
@@ -222,6 +232,15 @@ BusMaster ARMv6MCore::core_task()
     std::cout << "Undefined opcode " << std::hex << opcode << std::endl; \
     throw HardFault{"Undefined OpCode"}; \
   }
+
+#define SETFLAGS_NZ(result) \
+  ({m_APSR &= ~(APSR::NEGATIVE | APSR::ZERO); \
+  if (result & 0x80000000) { \
+    m_APSR |= APSR::NEGATIVE; \
+  } \
+  if (result == 0) { \
+    m_APSR |= APSR::ZERO; \
+  }})
 
 #define SETFLAGS_NZC(result, carry) \
   ({m_APSR &= ~(APSR::NEGATIVE | APSR::ZERO | APSR::CARRY); \
@@ -234,7 +253,7 @@ BusMaster ARMv6MCore::core_task()
   if (carry) { \
     m_APSR |= APSR::CARRY; \
   }})
-  
+
 #define SETFLAGS_NZCV(result, carry, overflow) \
   ({m_APSR &= ~(APSR::NEGATIVE | APSR::ZERO | APSR::CARRY | APSR::OVERFLOW); \
   if (result & 0x80000000) { \
@@ -255,12 +274,12 @@ BusMaster ARMv6MCore::core_task()
     uint32_t Rd = (opcode >> 16) & 0x07;\
     uint32_t Rm = (opcode >> 19) & 0x07;\
     uint32_t imm5 = (opcode >> 22) & 0x1f;\
-    uint32_t Rm_val = m_regs[Rd];\
+    uint32_t Rm_val = get_reg(Rm);\
     bool carry_out = Rm_val & (1<<(32-imm5));\
-    std::cout << "LSL R" << Rd << ", R" << Rm << ", #" << imm5 << std::endl;\
-    if (imm5 =! 0) {\
+    if (imm5 != 0) {\
       Rm_val <<= imm5;\
     }\
+    std::cout << "LSL R" << Rd << ", R" << Rm << ", #" << imm5 << " ; R" << Rd << " = " << Rm_val << std::endl;\
     set_reg(Rd, Rm_val);\
     SETFLAGS_NZC(Rm_val, carry_out);\
   }
@@ -270,21 +289,60 @@ BusMaster ARMv6MCore::core_task()
     uint32_t Rd = (opcode >> 16) & 0x07;\
     uint32_t Rm = (opcode >> 19) & 0x07;\
     uint32_t imm5 = (opcode >> 22) & 0x1f;\
-    uint32_t Rm_val = m_regs[Rd];\
+    uint32_t Rm_val = get_reg(Rm);\
     bool carry_out = Rm_val & (1<<(imm5));\
-    std::cout << "LSR R" << Rd << ", R" << Rm << ", #" << imm5 << std::endl;\
-    if (imm5 =! 0) {\
+    if (imm5 != 0) {\
       Rm_val >>= imm5;\
     }\
+    std::cout << "LSR R" << Rd << ", R" << Rm << ", #" << imm5 << " ; R" << Rd << " = " << Rm_val << std::endl;\
     set_reg(Rd, Rm_val);\
     SETFLAGS_NZC(Rm_val, carry_out);\
 }
+
+#define OPCODE_0001_100_add(opcode) \
+  { \
+    uint32_t Rd = (opcode >> 16) & 0x7;\
+    uint32_t Rn = (opcode >> 19) & 0x7;\
+    uint32_t Rm = (opcode >> 22) & 0x7;\
+    uint32_t Rn_val = get_reg(Rn);\
+    uint32_t Rm_val = get_reg(Rm);\
+    auto [result, carry, overflow] = AddWithCarry(Rn_val, Rm_val, 0);\
+    std::cout << "ADD R" << Rd << ", R" << Rn << ", R" << Rm << " ; R" << Rd << " = " << result << std::endl;\
+    set_reg(Rd, result);\
+    SETFLAGS_NZCV(result, carry, overflow);\
+  }
+
+#define OPCODE_0001_110_add(opcode) \
+  { \
+    uint32_t Rd = (opcode >> 16) & 0x7;\
+    uint32_t Rn = (opcode >> 19) & 0x7;\
+    uint32_t imm3 = (opcode >> 22) & 0x7;\
+    uint32_t Rn_val = get_reg(Rn);\
+    std::cout << "ADD R" << Rd << ", R" << Rn << ", #" << imm3 << std::endl;\
+    auto [result, carry, overflow] = AddWithCarry(Rn_val, imm3, 0);\
+    set_reg(Rd, result);\
+    SETFLAGS_NZCV(result, carry, overflow);\
+  }
+
+#define OPCODE_0001_111_sub(opcode) \
+  { \
+    uint32_t Rd = (opcode >> 16) & 0x7;\
+    uint32_t Rn = (opcode >> 19) & 0x7;\
+    uint32_t imm3 = (opcode >> 22) & 0x7;\
+    uint32_t Rn_val = get_reg(Rn);\
+    std::cout << "SUB R" << Rd << ", R" << Rn << ", #" << imm3 << std::endl;\
+    auto [result, carry, overflow] = AddWithCarry(Rn_val, ~imm3, 1);\
+    set_reg(Rd, result);\
+    SETFLAGS_NZCV(result, carry, overflow);\
+  }
+
+
 
 #define OPCODE_0010_0xx_mov(opcode) \
   { \
     uint32_t imm8 = (opcode >> 16) & 0xff;\
     uint32_t Rd = (opcode >> 24) & 0x07;\
-    std::cout << "MOV R" << Rd << ", #" << imm8 << std::endl;\
+    std::cout << "MOV R" << Rd << ", #" << imm8 << " ; R" << Rd << " = " << imm8 << std::endl;\
     set_reg(Rd, imm8);\
     if (imm8) {\
       m_APSR &= ~APSR::ZERO;\
@@ -295,7 +353,7 @@ BusMaster ARMv6MCore::core_task()
 
 std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry_in)
 {
-  uint64_t result = a + b + carry_in;
+  uint64_t result = (uint64_t)a + (uint64_t)b + (uint64_t)carry_in;
   bool carry_out = result & 0x100000000;
   bool overflow = ((a & 0x80000000) == (b & 0x80000000)) && ((a & 0x80000000) != (result & 0x80000000));
   return {result, carry_out, overflow};
@@ -309,37 +367,104 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     uint32_t Rn_val = get_reg(Rn);\
     std::cout << "CMP R" << Rn << ", #" << imm8 << std::endl;\
     auto [result, carry, overflow] = AddWithCarry(Rn_val, simm32, 1);\
+    std::cout << carry << std::endl;\
     m_APSR &= ~(APSR::NEGATIVE | APSR::ZERO | APSR::CARRY | APSR::OVERFLOW);\
-    if (result & 0x80000000) {\
-      m_APSR |= APSR::NEGATIVE;\
-    }\
-    if (result == 0) {\
-      m_APSR |= APSR::ZERO;\
-    }\
-    if (Rn_val >= (255-imm8)) {\
-      m_APSR |= APSR::CARRY;\
-    }\
-    if ((Rn_val & 0x80000000) != (simm32 & 0x80000000) && (Rn_val & 0x80000000) != (result & 0x80000000)) {\
-      m_APSR |= APSR::OVERFLOW;\
-    }\
-  }
-
-#define OPCODE_0011_10x_add(opcode) \
-  { \
-    uint32_t Rd = (opcode >> 16) & 0x7;\
-    uint32_t Rn = (opcode >> 19) & 0x7;\
-    uint32_t imm3 = (opcode >> 22) & 0x7;\
-    uint32_t Rn_val = get_reg(Rn);\
-    std::cout << "ADD R" << Rd << ", R" << Rn << ", #" << imm3 << std::endl;\
-    auto [result, carry, overflow] = AddWithCarry(Rn_val, imm3, 0);\
-    set_reg(Rd, result);\
     SETFLAGS_NZCV(result, carry, overflow);\
   }
 
-#define OPCODE_0100_001_arith(opcode) \
+#define OPCODE_0011_0xx_add(opcode) \
+  { \
+    uint32_t Rdn = (opcode >> 24) & 0x7;\
+    uint32_t imm8 = (opcode >> 16) & 0xff;\
+    uint32_t Rn_val = get_reg(Rdn);\
+    std::cout << "ADD R" << Rdn << ", R" << Rdn << ", #" << imm8 << std::endl;\
+    auto [result, carry, overflow] = AddWithCarry(Rn_val, imm8, 0);\
+    set_reg(Rdn, result);\
+    SETFLAGS_NZCV(result, carry, overflow);\
+  }
+
+#define OPCODE_0011_1xx_sub(opcode) \
+  { \
+    uint32_t Rdn = (opcode >> 24) & 0x7;\
+    uint32_t imm8 = (opcode >> 16) & 0xff;\
+    uint32_t Rn_val = get_reg(Rdn);\
+    auto [result, carry, overflow] = AddWithCarry(Rn_val, ~imm8, 1);\
+    std::cout << "SUB R" << Rdn << ", R" << Rdn << ", #" << imm8 << " ; R" << Rdn << " = " << result << std::endl;\
+    set_reg(Rdn, result);\
+    SETFLAGS_NZCV(result, carry, overflow);\
+  }
+
+#define OPCODE_0100_00x_arith(opcode) \
 {\
   uint8_t sub_opcode = (opcode >> 22) & 0xf;\
   switch(sub_opcode) {\
+    case 0b0000:{\
+      uint32_t Rdn = (opcode >> 16) & 0x07;\
+      uint32_t Rm = (opcode >> 19) & 0x07;\
+      uint32_t Rdn_val = get_reg(Rdn);\
+      uint32_t Rm_val = get_reg(Rm);\
+      Rdn_val &= Rm_val; \
+      std::cout << "AND R"<< Rdn << ", R" << Rm << " ; R" << Rm << " = " << Rdn_val << std::endl;\
+      set_reg(Rdn, Rdn_val); \
+      SETFLAGS_NZ(Rdn_val);\
+    } break; \
+    case 0b0001:{\
+      uint32_t Rdn = (opcode >> 16) & 0x07;\
+      uint32_t Rm = (opcode >> 19) & 0x07;\
+      uint32_t Rdn_val = get_reg(Rdn);\
+      uint32_t Rm_val = get_reg(Rm);\
+      Rdn_val ^= Rm_val; \
+      std::cout << "EOR R"<< Rdn << ", R" << Rm << " ; R" << Rm << " = " << Rdn_val << std::endl;\
+      set_reg(Rdn, Rdn_val); \
+      SETFLAGS_NZ(Rdn_val);\
+    } break; \
+    case 0b1000:{\
+      uint32_t Rn = (opcode >> 16) & 0x07;\
+      uint32_t Rm = (opcode >> 19) & 0x07;\
+      uint32_t Rn_val = get_reg(Rn);\
+      uint32_t Rm_val = get_reg(Rm);\
+      uint32_t result = Rn_val & Rm_val;\
+      std::cout << "TST R"<< Rn << ", R" << Rm << std::endl;\
+      SETFLAGS_NZ(result);\
+    } break;\
+    case 0b1001:{\
+      uint32_t Rd = (opcode >> 16) & 0x07;\
+      uint32_t Rn = (opcode >> 19) & 0x07;\
+      uint32_t Rn_val = get_reg(Rn);\
+      auto [result, carry, overflow] = AddWithCarry(~Rn_val, 0, 1);\
+      std::cout << "RSB R"<< Rd << ", R" << Rn << std::endl;\
+      set_reg(Rd, result); \
+      SETFLAGS_NZCV(result, carry, overflow);\
+    } break;\
+    case 0b1010:{\
+      uint32_t Rm = (opcode >> 19) & 0x07;\
+      uint32_t Rn = (opcode >> 16) & 0x07;\
+      uint32_t Rm_val = get_reg(Rm);\
+      uint32_t Rn_val = get_reg(Rn);\
+      auto [result, carry, overflow] = AddWithCarry(Rn_val, ~Rm_val, true);\
+      std::cout << "CMP R"<< Rm << ", R" << Rn << std::endl;\
+      SETFLAGS_NZCV(result, carry, overflow);\
+    } break;\
+    case 0b1100:{\
+      uint32_t Rdn = (opcode >> 16) & 0x7;\
+      uint32_t Rm = (opcode >> 19) & 0x7;\
+      uint32_t Rdn_val = get_reg(Rdn);\
+      uint32_t Rm_val = get_reg(Rm);\
+      Rdn_val |= Rm_val;\
+      std::cout << "ORR R" << Rdn << ", R" << Rm << std::endl;\
+      set_reg(Rdn, Rdn_val);\
+      SETFLAGS_NZ(Rdn_val);\
+    } break;\
+    case 0b1110:{\
+      uint32_t Rd = (opcode >> 16) & 0x7;\
+      uint32_t Rn = (opcode >> 19) & 0x7;\
+      uint32_t Rd_val = get_reg(Rd);\
+      uint32_t Rn_val = get_reg(Rn);\
+      Rd_val &= ~Rn_val;\
+      std::cout << "BIC R" << Rd << ", R" << Rn << std::endl;\
+      set_reg(Rd, Rd_val);\
+      SETFLAGS_NZ(Rd_val);\
+    } break;\
     case 0b1111:{\
       uint32_t Rd = (opcode >> 16) & 0x7;\
       uint32_t Rn = (opcode >> 19) & 0x7;\
@@ -347,7 +472,7 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
       set_reg(Rd, ~get_reg(Rn));\
       SETFLAGS_NZC(~get_reg(Rn), false);\
     } break;\
-    default: throw HardFault{};\
+    default: throw HardFault{"Unknown arith instr"};\
   }\
 }
 
@@ -356,8 +481,14 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     if ((opcode & 1<<24) == 0){\
       uint32_t Rd = ((opcode >> 16) & 0x7) | ((opcode >> 20) & 0x08) ; \
       uint32_t Rm = (opcode >> 19) & 0xf; \
-      std::cout << "MOV R" << Rd << ", R" << Rm << std::endl;\
-      set_reg(Rd, get_reg(Rm)); \
+      uint32_t RegVal = get_reg(Rm);\
+      std::cout << "MOV R" << Rd << ", R" << Rm << " ; R" << Rd << " = " << RegVal << std::endl;\
+      if (Rd == 15) {\
+        m_nextPC = RegVal;\
+      } else {\
+        set_reg(Rd, RegVal); \
+        SETFLAGS_NZ(RegVal);\
+      }\
     } else if ((opcode & 1<<23) == 0) {\
       uint8_t Rm = (opcode>>19) & 0xf;\
       m_nextPC = get_reg(Rm);\
@@ -407,6 +538,71 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     set_reg(Rt, data); \
   }
 
+#define OPCODE_0111_0xx_strb(opcode) \
+  { \
+    uint32_t imm5 = (opcode >> 22) & 0x1F; \
+    uint32_t Rt = (opcode >> 16) & 0x7; \
+    uint32_t Rn = (opcode >> 19) & 0x7; \
+    uint32_t addr = get_reg(Rn) + imm5; \
+    uint32_t data = get_reg(Rt); \
+    std::cout << "STRB R" << Rt << ", [R" << Rn << ", #" << imm5 << "] (" << std::hex << addr << std::dec << ")" << std::endl;\
+    co_await m_mpu_bus_interface.write_byte(addr, data); \
+  }
+
+#define OPCODE_0111_1xx_ldrb(opcode) \
+  { \
+    uint32_t imm32 = (opcode >> 22) & 0x1F; \
+    uint32_t Rt = (opcode >> 16) & 0x7; \
+    uint32_t Rn = (opcode >> 19) & 0x7; \
+    uint32_t addr = get_reg(Rn) + imm32; \
+    uint32_t data = co_await m_mpu_bus_interface.read_byte(addr);\
+    std::cout << "LDRB R" << Rt << ", [R" << Rn << ", #" << imm32 << "] (" << std::hex << addr << "," << data << std::dec << ")" << std::endl;\
+    set_reg(Rt, data); \
+  }
+
+#define OPCODE_1000_0xx_strh(opcode) \
+  { \
+    uint32_t imm32 = (opcode >> 21) & 0x3E; \
+    uint32_t Rt = (opcode >> 16) & 0x7; \
+    uint32_t Rn = (opcode >> 19) & 0x7; \
+    uint32_t addr = get_reg(Rn) + imm32; \
+    uint32_t data = get_reg(Rt); \
+    std::cout << "STRH R" << Rt << ", [R" << Rn << ", #" << imm32 << "] (" << std::hex << addr << std::dec << ")" << std::endl;\
+    co_await m_mpu_bus_interface.write_halfword(addr, data); \
+  }
+
+#define OPCODE_1000_1xx_ldrh(opcode) \
+  { \
+    uint32_t imm32 = (opcode >> 21) & 0x3E; \
+    uint32_t Rt = (opcode >> 16) & 0x7; \
+    uint32_t Rn = (opcode >> 19) & 0x7; \
+    uint32_t addr = get_reg(Rn) + imm32; \
+    uint32_t data = co_await m_mpu_bus_interface.read_halfword(addr);\
+    std::cout << "LDRH R" << Rt << ", [R" << Rn << ", #" << imm32 << "] (" << std::hex << addr << std::dec << ")" << std::endl;\
+    set_reg(Rt, data); \
+  }
+
+#define OPCODE_1001_0xx_str(opcode) \
+  { \
+    uint32_t imm32 = (opcode >> 14) & 0x3FC; \
+    uint32_t Rt = (opcode >> 24) & 0x7; \
+    uint32_t Rn = 13;\
+    uint32_t addr = get_reg(Rn) + imm32; \
+    std::cout << "STR R" << Rt << ", [SP, #" << imm32 << "] (" << std::hex << addr << std::dec << ")" << std::endl;\
+    co_await m_mpu_bus_interface.write_word(addr, get_reg(Rt)); \
+  }
+
+#define OPCODE_1001_1xx_ldr(opcode) \
+  { \
+    uint32_t imm32 = (opcode >> 14) & 0x3FC; \
+    uint32_t Rt = (opcode >> 24) & 0x7; \
+    uint32_t Rn = 13;\
+    uint32_t addr = get_reg(Rn) + imm32; \
+    std::cout << "LDR R" << Rt << ", [SP, #" << imm32 << "] (" << std::hex << addr << std::dec << ")" << std::endl;\
+    uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
+    set_reg(Rt, data); \
+  }
+
 #define OPCODE_1010_0xx_add(opcode) \
   { \
     uint32_t imm32 = (opcode >> 14) & 0x3FC; \
@@ -414,6 +610,122 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     uint32_t addr = PC() & ~0x03 + imm32; \
     std::cout << "ADD R" << Rd << ", PC, #" << imm32 << "( " << std::hex << addr << std::dec << " )" << std::endl;\
     set_reg(Rd, addr);\
+  }
+
+#define OPCODE_1010_1xx_spadd(opcode) \
+  { \
+    uint32_t imm32 = (opcode >> 14) & 0x3FC; \
+    uint32_t Rd = (opcode >> 24) & 0x7;\
+    auto [result, carry, overflow] = AddWithCarry(SP(), imm32, 0);\
+    std::cout << "ADD R" << Rd << ", SP, #" << imm32 << "( " << std::hex << result << std::dec << " )" << std::endl;\
+    set_reg(Rd, result);\
+  }
+
+#define OPCODE_1011_000_sp(opcode) \
+  { \
+    switch(opcode & 0x0080'0000){\
+      case 0x0000'0000: {\
+        uint32_t imm32 = (opcode >> 14) & 0x1fc;\
+        auto [newsp, carry, overflow] = AddWithCarry(SP(), imm32, 0);\
+        std::cout << "ADD SP, #" << imm32 << std::endl;\
+        SP() = newsp;\
+      } break;\
+      case 0x0080'0000: {\
+        uint32_t imm32 = (opcode >> 14) & 0x1fc;\
+        auto [newsp, carry, overflow] = AddWithCarry(SP(), ~imm32, 1);\
+        std::cout << "SUB SP, #" << imm32 << std::endl;\
+        SP() = newsp;\
+      } break;\
+      default: throw HardFault{"SPSE something or other"};\
+    }\
+  }
+
+#define OPCODE_1011_001_ext(opcode) \
+  { \
+    uint32_t Rd = (opcode >> 16) & 0xf;\
+    uint32_t Rm = (opcode >> 19) & 0xf;\
+    uint32_t Rm_val = get_reg(Rm);\
+    switch(opcode & 0x00c0'0000){\
+      case 0x0000'0000: {\
+        std::cout << "SXTH R" << Rd << ", R" << Rm << std::endl;\
+        Rm_val = Rm_val&0xffff;\
+        Rm_val |= 0 - (Rm_val&0x8000);\
+        set_reg(Rd, Rm_val);\
+      } break;\
+      case 0x0040'0000: {\
+        std::cout << "SXTB R" << Rd << ", R" << Rm << std::endl;\
+        Rm_val = Rm_val&0xff;\
+        Rm_val |= 0 - (Rm_val&0x80);\
+        set_reg(Rd, Rm_val);\
+      } break;\
+      case 0x0080'0000: {\
+        std::cout << "UXTH R" << Rd << ", R" << Rm << std::endl;\
+        Rm_val = Rm_val&0xffff;\
+        set_reg(Rd, Rm_val);\
+      } break;\
+      case 0x00c0'0000: {\
+        std::cout << "UXTB R" << Rd << ", R" << Rm << std::endl;\
+        Rm_val = Rm_val&0xff;\
+        set_reg(Rd, Rm_val);\
+      } break;\
+      default: throw HardFault{"Sign Extenison something or other"};\
+    }\
+  }
+
+#define OPCODE_1011_010_pushm(opcode) \
+  {\
+    uint32_t regs_list = (opcode >> 16) & 0xff | (opcode >> 10) & 0x4000;\
+    uint32_t addr = SP();\
+    std::cout << "PUSH {" << std::bitset<16>{regs_list} << "}" << std::endl;\
+    for (int i = 14; i >= 0; i--) {\
+      if ((regs_list & (1<<i)) == 0) continue; \
+      co_await m_mpu_bus_interface.write_word(addr-4, get_reg(i));\
+      addr -= 4;\
+    }\
+    SP() = addr;\
+  }
+
+#define OPCODE_1011_101_rev(opcode) \
+  {\
+    uint32_t Rd = (opcode >> 16) & 0x7;\
+    uint32_t Rm = (opcode >> 19) & 0x7;\
+    uint32_t Rm_val = get_reg(Rm);\
+    switch(opcode & 0x01c0'0000){\
+      case 0x0000'0000:\
+        Rm_val = ((Rm_val & 0xff) << 24) | ((Rm_val & 0xff00) << 8) | ((Rm_val & 0xff0000) >> 8) | ((Rm_val & 0xff000000) >> 24);\
+        std::cout << "REV "; break; \
+      case 0x0040'0000:\
+        Rm_val = ((Rm_val & 0xffff) << 16) | ((Rm_val & 0xffff0000) >> 8);\
+        std::cout << "REV16 "; break; \
+      case 0x00c0'0000:\
+        Rm_val = ((Rm_val & 0xffff) << 16) | ((Rm_val & 0xffff0000) >> 8);\
+        std::cout << "REVSH "; \
+      default: \
+        throw HardFault{"bad REV instr"}; \
+    }\
+    std::cout << "R" << Rd << ", R" << Rm << std::endl;\
+    set_reg(Rd, Rm_val);\
+  }
+
+#define OPCODE_1011_110_popm(opcode) \
+  {\
+    uint32_t regs_list = (opcode >> 16) & 0xff | (opcode >> 9) & 0x8000;\
+    uint32_t addr = SP();\
+    std::cout << "POP {" << std::bitset<16>{regs_list} << "}" << std::endl;\
+    for (int i = 0; i <= 7; i++) {\
+      if ((regs_list & (1<<i)) == 0) continue; \
+      std::cout << "popping from " << std::hex << addr << std::dec << std::endl;\
+      set_reg(i, co_await m_mpu_bus_interface.read_word(addr));\
+      addr += 4;\
+    }\
+    if (regs_list & (1<<15)) {\
+      std::cout << "popping from " << std::hex << addr << std::dec << std::endl;\
+      m_nextPC = co_await m_mpu_bus_interface.read_word(addr);\
+      std::cout << "new PC " << std::hex << m_nextPC << std::dec << std::endl;\
+      addr += 4;\
+    }\
+    std::cout << "POP {" << std::bitset<16>{regs_list} << "}" << std::endl;\
+    SP() = addr;\
   }
 
 #define OPCODE_1011_111_misc(opcode) \
@@ -447,6 +759,22 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     }\
   }
 
+#define OPCODE_1100_1xx_ldm(opcode) \
+  { \
+    uint32_t Rn = (opcode >> 24) & 0x7;\
+    uint32_t reg_list = (opcode >> 16) & 0xff;\
+    bool wback = (reg_list & (1<<Rn)) == 0;\
+    reg_list &= ~(1<<Rn);\
+    uint32_t Rn_val = get_reg(Rn);\
+    std::cout << "LDM R" << Rn << (wback?" {":"! {") << std::bitset<8>{reg_list} << "}" << std::endl;\
+    for (int i = 0; i < 8; i++) {\
+      if ((reg_list & (1<<i)) == 0) continue;\
+      set_reg(i, co_await m_mpu_bus_interface.read_word(Rn_val));\
+      Rn_val += 4;\
+    }\
+    if (wback) set_reg(Rn, Rn_val);\
+  }
+
 #define OPCODE_1101_xxx_branch(opcode) \
   { \
     uint32_t cond = (opcode >> 24) & 0xf; \
@@ -456,22 +784,75 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     bool jump;\
     switch (cond) {\
       case Cond::EQ: \
-        std::cout << "BEQ " << std::hex << addr << std::dec << std::endl;\
-        jump = (m_APSR & APSR::ZERO); break;\
+        jump = (m_APSR & APSR::ZERO); \
+        std::cout << "BEQ " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
       case Cond::NE: \
-        std::cout << "BNE " << std::hex << addr << std::dec << std::endl;\
-        jump = !(m_APSR & APSR::ZERO); break;\
+        jump = !(m_APSR & APSR::ZERO); \
+        std::cout << "BNE " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
       case Cond::CS: \
-        std::cout << "BCS " << std::hex << addr << std::dec << std::endl;\
-        jump = (m_APSR & APSR::CARRY); break;\
+        jump = (m_APSR & APSR::CARRY); \
+        std::cout << "BCS " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
       case Cond::CC: \
-        std::cout << "BCC " << std::hex << addr << std::dec << std::endl;\
-        jump = !(m_APSR & APSR::CARRY); break;\
-      default: assert(false); \
+        jump = !(m_APSR & APSR::CARRY); \
+        std::cout << "BCC " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::MI: \
+        jump = (m_APSR & APSR::NEGATIVE); \
+        std::cout << "BMI " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::PL: \
+        jump = !(m_APSR & APSR::NEGATIVE); \
+        std::cout << "BPL " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::VS: \
+        jump = (m_APSR & APSR::OVERFLOW); \
+        std::cout << "BVS " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::VC: \
+        jump = !(m_APSR & APSR::OVERFLOW); \
+        std::cout << "BVC " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::HI: \
+        jump = ((m_APSR & APSR::CARRY) && !(m_APSR & APSR::ZERO)); \
+        std::cout << "BHI " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::LS: \
+        jump = (!(m_APSR & APSR::CARRY) || (m_APSR & APSR::ZERO)); \
+        std::cout << "BLS " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::GE: \
+        jump = (!!(m_APSR & APSR::NEGATIVE) == !!(m_APSR & APSR::OVERFLOW)); \
+        std::cout << "BGE " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::LT: \
+        jump = (!!(m_APSR & APSR::NEGATIVE) != !!(m_APSR & APSR::OVERFLOW)); \
+        std::cout << "BLT " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::GT: \
+        jump = (!(m_APSR & APSR::ZERO) && (!!(m_APSR & APSR::NEGATIVE) == !!(m_APSR & APSR::OVERFLOW))); \
+        std::cout << "BGT " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      case Cond::LE: \
+        jump = ((m_APSR & APSR::ZERO) && (!!(m_APSR & APSR::NEGATIVE) != !!(m_APSR & APSR::OVERFLOW))); \
+        std::cout << "BLE " << std::hex << addr << std::dec << " " << std::bitset<4>{m_APSR>>28} << (jump?" y":" n") << std::endl;\
+        break;\
+      default: throw HardFault{"unrecognised branch instr"}; \
     }\
     if (jump) { \
       m_nextPC = addr; /*This isn't right!*/ \
     } \
+  }
+
+#define OPCODE_1110_0xx_branch(opcode) \
+  { \
+    uint32_t imm11 = (opcode >> 15) & 0xffe; \
+    if (imm11 >= 2048) imm11 -= 4096; \
+    uint32_t addr = PC() + imm11 + 4;\
+    std::cout << "B " << std::hex << addr << std::dec << std::endl;\
+    m_nextPC = addr; \
   }
 
 #define OPCODE_1111_01x_bl(opcode) \
@@ -487,7 +868,7 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     LR() = m_nextPC;\
     m_nextPC = addr;\
   }
-  
+
 #define OPCODE_1111_00x_bl(opcode) \
   { \
     uint8_t cond = (opcode >> 24) & 0xf; \
@@ -515,10 +896,10 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*0001_001*/ o(0b0001'001, OPCODE_UNDEFINED) \
   /*0001_010*/ o(0b0001'010, OPCODE_UNDEFINED) \
   /*0001_011*/ o(0b0001'011, OPCODE_UNDEFINED) \
-  /*0001_100*/ o(0b0001'100, OPCODE_UNDEFINED) \
+  /*0001_100*/ o(0b0001'100, OPCODE_0001_100_add) \
   /*0001_101*/ o(0b0001'101, OPCODE_UNDEFINED) \
-  /*0001_110*/ o(0b0001'110, OPCODE_UNDEFINED) \
-  /*0001_111*/ o(0b0001'111, OPCODE_UNDEFINED) \
+  /*0001_110*/ o(0b0001'110, OPCODE_0001_110_add) \
+  /*0001_111*/ o(0b0001'111, OPCODE_0001_111_sub) \
   /*0010_000*/ o(0b0010'000, OPCODE_0010_0xx_mov) \
   /*0010_001*/ o(0b0010'001, OPCODE_0010_0xx_mov) \
   /*0010_010*/ o(0b0010'010, OPCODE_0010_0xx_mov) \
@@ -527,16 +908,16 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*0010_101*/ o(0b0010'101, OPCODE_0010_1xx_cmp) \
   /*0010_110*/ o(0b0010'110, OPCODE_0010_1xx_cmp) \
   /*0010_111*/ o(0b0010'111, OPCODE_0010_1xx_cmp) \
-  /*0011_000*/ o(0b0011'000, OPCODE_0011_10x_add) \
-  /*0011_001*/ o(0b0011'001, OPCODE_0011_10x_add) \
-  /*0011_010*/ o(0b0011'010, OPCODE_0011_10x_add) \
-  /*0011_011*/ o(0b0011'011, OPCODE_0011_10x_add) \
-  /*0011_100*/ o(0b0011'100, OPCODE_UNDEFINED) \
-  /*0011_101*/ o(0b0011'101, OPCODE_UNDEFINED) \
-  /*0011_110*/ o(0b0011'110, OPCODE_UNDEFINED) \
-  /*0011_111*/ o(0b0011'111, OPCODE_UNDEFINED) \
-  /*0100_000*/ o(0b0100'000, OPCODE_UNDEFINED) \
-  /*0100_011*/ o(0b0100'001, OPCODE_0100_001_arith) \
+  /*0011_000*/ o(0b0011'000, OPCODE_0011_0xx_add) \
+  /*0011_001*/ o(0b0011'001, OPCODE_0011_0xx_add) \
+  /*0011_010*/ o(0b0011'010, OPCODE_0011_0xx_add) \
+  /*0011_011*/ o(0b0011'011, OPCODE_0011_0xx_add) \
+  /*0011_100*/ o(0b0011'100, OPCODE_0011_1xx_sub) \
+  /*0011_101*/ o(0b0011'101, OPCODE_0011_1xx_sub) \
+  /*0011_110*/ o(0b0011'110, OPCODE_0011_1xx_sub) \
+  /*0011_111*/ o(0b0011'111, OPCODE_0011_1xx_sub) \
+  /*0100_000*/ o(0b0100'000, OPCODE_0100_00x_arith) \
+  /*0100_011*/ o(0b0100'001, OPCODE_0100_00x_arith) \
   /*0100_010*/ o(0b0100'010, OPCODE_UNDEFINED) \
   /*0100_001*/ o(0b0100'011, OPCODE_0100_011_mov) \
   /*0100_100*/ o(0b0100'100, OPCODE_0100_1xx_load) \
@@ -559,54 +940,54 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*0110_101*/ o(0b0110'101, OPCODE_0110_1xx_load) \
   /*0110_110*/ o(0b0110'110, OPCODE_0110_1xx_load) \
   /*0110_111*/ o(0b0110'111, OPCODE_0110_1xx_load) \
-  /*0111_000*/ o(0b0111'000, OPCODE_UNDEFINED) \
-  /*0111_001*/ o(0b0111'001, OPCODE_UNDEFINED) \
-  /*0111_010*/ o(0b0111'010, OPCODE_UNDEFINED) \
-  /*0111_011*/ o(0b0111'011, OPCODE_UNDEFINED) \
-  /*0111_100*/ o(0b0111'100, OPCODE_UNDEFINED) \
-  /*0111_101*/ o(0b0111'101, OPCODE_UNDEFINED) \
-  /*0111_110*/ o(0b0111'110, OPCODE_UNDEFINED) \
-  /*0111_111*/ o(0b0111'111, OPCODE_UNDEFINED) \
-  /*1000_000*/ o(0b1000'000, OPCODE_UNDEFINED) \
-  /*1000_001*/ o(0b1000'001, OPCODE_UNDEFINED) \
-  /*1000_010*/ o(0b1000'010, OPCODE_UNDEFINED) \
-  /*1000_011*/ o(0b1000'011, OPCODE_UNDEFINED) \
-  /*1000_100*/ o(0b1000'100, OPCODE_UNDEFINED) \
-  /*1000_101*/ o(0b1000'101, OPCODE_UNDEFINED) \
-  /*1000_110*/ o(0b1000'110, OPCODE_UNDEFINED) \
-  /*1000_111*/ o(0b1000'111, OPCODE_UNDEFINED) \
-  /*1001_000*/ o(0b1001'000, OPCODE_UNDEFINED) \
-  /*1001_001*/ o(0b1001'001, OPCODE_UNDEFINED) \
-  /*1001_010*/ o(0b1001'010, OPCODE_UNDEFINED) \
-  /*1001_011*/ o(0b1001'011, OPCODE_UNDEFINED) \
-  /*1001_100*/ o(0b1001'100, OPCODE_UNDEFINED) \
-  /*1001_101*/ o(0b1001'101, OPCODE_UNDEFINED) \
-  /*1001_110*/ o(0b1001'110, OPCODE_UNDEFINED) \
-  /*1001_111*/ o(0b1001'111, OPCODE_UNDEFINED) \
+  /*0111_000*/ o(0b0111'000, OPCODE_0111_0xx_strb) \
+  /*0111_001*/ o(0b0111'001, OPCODE_0111_0xx_strb) \
+  /*0111_010*/ o(0b0111'010, OPCODE_0111_0xx_strb) \
+  /*0111_011*/ o(0b0111'011, OPCODE_0111_0xx_strb) \
+  /*0111_100*/ o(0b0111'100, OPCODE_0111_1xx_ldrb) \
+  /*0111_101*/ o(0b0111'101, OPCODE_0111_1xx_ldrb) \
+  /*0111_110*/ o(0b0111'110, OPCODE_0111_1xx_ldrb) \
+  /*0111_111*/ o(0b0111'111, OPCODE_0111_1xx_ldrb) \
+  /*1000_000*/ o(0b1000'000, OPCODE_1000_0xx_strh) \
+  /*1000_001*/ o(0b1000'001, OPCODE_1000_0xx_strh) \
+  /*1000_010*/ o(0b1000'010, OPCODE_1000_0xx_strh) \
+  /*1000_011*/ o(0b1000'011, OPCODE_1000_0xx_strh) \
+  /*1000_100*/ o(0b1000'100, OPCODE_1000_1xx_ldrh) \
+  /*1000_101*/ o(0b1000'101, OPCODE_1000_1xx_ldrh) \
+  /*1000_110*/ o(0b1000'110, OPCODE_1000_1xx_ldrh) \
+  /*1000_111*/ o(0b1000'111, OPCODE_1000_1xx_ldrh) \
+  /*1001_000*/ o(0b1001'000, OPCODE_1001_0xx_str) \
+  /*1001_001*/ o(0b1001'001, OPCODE_1001_0xx_str) \
+  /*1001_010*/ o(0b1001'010, OPCODE_1001_0xx_str) \
+  /*1001_011*/ o(0b1001'011, OPCODE_1001_0xx_str) \
+  /*1001_100*/ o(0b1001'100, OPCODE_1001_1xx_ldr) \
+  /*1001_101*/ o(0b1001'101, OPCODE_1001_1xx_ldr) \
+  /*1001_110*/ o(0b1001'110, OPCODE_1001_1xx_ldr) \
+  /*1001_111*/ o(0b1001'111, OPCODE_1001_1xx_ldr) \
   /*1010_000*/ o(0b1010'000, OPCODE_1010_0xx_add) \
   /*1010_001*/ o(0b1010'001, OPCODE_1010_0xx_add) \
   /*1010_010*/ o(0b1010'010, OPCODE_1010_0xx_add) \
   /*1010_011*/ o(0b1010'011, OPCODE_1010_0xx_add) \
-  /*1010_100*/ o(0b1010'100, OPCODE_UNDEFINED) \
-  /*1010_101*/ o(0b1010'101, OPCODE_UNDEFINED) \
-  /*1010_110*/ o(0b1010'110, OPCODE_UNDEFINED) \
-  /*1010_111*/ o(0b1010'111, OPCODE_UNDEFINED) \
-  /*1011_000*/ o(0b1011'000, OPCODE_UNDEFINED) \
-  /*1011_001*/ o(0b1011'001, OPCODE_UNDEFINED) \
-  /*1011_010*/ o(0b1011'010, OPCODE_UNDEFINED) \
+  /*1010_100*/ o(0b1010'100, OPCODE_1010_1xx_spadd) \
+  /*1010_101*/ o(0b1010'101, OPCODE_1010_1xx_spadd) \
+  /*1010_110*/ o(0b1010'110, OPCODE_1010_1xx_spadd) \
+  /*1010_111*/ o(0b1010'111, OPCODE_1010_1xx_spadd) \
+  /*1011_000*/ o(0b1011'000, OPCODE_1011_000_sp) \
+  /*1011_001*/ o(0b1011'001, OPCODE_1011_001_ext) \
+  /*1011_010*/ o(0b1011'010, OPCODE_1011_010_pushm) \
   /*1011_011*/ o(0b1011'011, OPCODE_UNDEFINED) \
   /*1011_100*/ o(0b1011'100, OPCODE_UNDEFINED) \
-  /*1011_101*/ o(0b1011'101, OPCODE_UNDEFINED) \
-  /*1011_110*/ o(0b1011'110, OPCODE_UNDEFINED) \
+  /*1011_101*/ o(0b1011'101, OPCODE_1011_101_rev) \
+  /*1011_110*/ o(0b1011'110, OPCODE_1011_110_popm) \
   /*1011_111*/ o(0b1011'111, OPCODE_1011_111_misc) \
   /*1100_000*/ o(0b1100'000, OPCODE_UNDEFINED) \
   /*1100_001*/ o(0b1100'001, OPCODE_UNDEFINED) \
   /*1100_010*/ o(0b1100'010, OPCODE_UNDEFINED) \
   /*1100_011*/ o(0b1100'011, OPCODE_UNDEFINED) \
-  /*1100_100*/ o(0b1100'100, OPCODE_UNDEFINED) \
-  /*1100_101*/ o(0b1100'101, OPCODE_UNDEFINED) \
-  /*1100_110*/ o(0b1100'110, OPCODE_UNDEFINED) \
-  /*1100_111*/ o(0b1100'111, OPCODE_UNDEFINED) \
+  /*1100_100*/ o(0b1100'100, OPCODE_1100_1xx_ldm) \
+  /*1100_101*/ o(0b1100'101, OPCODE_1100_1xx_ldm) \
+  /*1100_110*/ o(0b1100'110, OPCODE_1100_1xx_ldm) \
+  /*1100_111*/ o(0b1100'111, OPCODE_1100_1xx_ldm) \
   /*1101_000*/ o(0b1101'000, OPCODE_1101_xxx_branch) \
   /*1101_001*/ o(0b1101'001, OPCODE_1101_xxx_branch) \
   /*1101_010*/ o(0b1101'010, OPCODE_1101_xxx_branch) \
@@ -615,10 +996,10 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*1101_101*/ o(0b1101'101, OPCODE_1101_xxx_branch) \
   /*1101_110*/ o(0b1101'110, OPCODE_1101_xxx_branch) \
   /*1101_111*/ o(0b1101'111, OPCODE_1101_xxx_branch) \
-  /*1110_000*/ o(0b1110'000, OPCODE_UNDEFINED) \
-  /*1110_001*/ o(0b1110'001, OPCODE_UNDEFINED) \
-  /*1110_010*/ o(0b1110'010, OPCODE_UNDEFINED) \
-  /*1110_011*/ o(0b1110'011, OPCODE_UNDEFINED) \
+  /*1110_000*/ o(0b1110'000, OPCODE_1110_0xx_branch) \
+  /*1110_001*/ o(0b1110'001, OPCODE_1110_0xx_branch) \
+  /*1110_010*/ o(0b1110'010, OPCODE_1110_0xx_branch) \
+  /*1110_011*/ o(0b1110'011, OPCODE_1110_0xx_branch) \
   /*1110_100*/ o(0b1110'100, OPCODE_UNDEFINED) \
   /*1110_101*/ o(0b1110'101, OPCODE_UNDEFINED) \
   /*1110_110*/ o(0b1110'110, OPCODE_UNDEFINED) \
@@ -638,17 +1019,37 @@ Awaitable<void> ARMv6MCore::exec_instr(uint32_t instr)
   #define OPCODE(prefix, fun) \
     case prefix: \
       fun(instr); \
-      break; 
+      break;
+
+  #define REP0 OPCODE
+
+  #define REP1(prefix, fun) \
+    REP0(prefix##0, fun) \
+    REP0(prefix##1, fun) \
+
+  #define REP2(prefix, fun) \
+    REP1(prefix##0, fun) \
+    REP1(prefix##1, fun) \
+
+  #define REP3(prefix, fun) \
+    REP2(prefix##0, fun) \
+    REP2(prefix##1, fun) \
+
   switch(instr >> 25) {
-    ENUM_OPCODES(OPCODE)
+    ENUM_OPCODES(REP0)
   }
+  #undef OPCODE
+  #undef REP1
+  #undef REP2
+  #undef REP3
+  #undef REP4
   co_return;
 }
 
 
 PortState ARMv6MCore::PPB::read_byte(uint32_t addr, uint8_t &out){ throw ARMv6M::BusFault(); }
 PortState ARMv6MCore::PPB::read_halfword(uint32_t addr, uint16_t &out){ throw ARMv6M::BusFault(); }
-PortState ARMv6MCore::PPB::read_word(uint32_t addr, uint32_t &out){ 
+PortState ARMv6MCore::PPB::read_word(uint32_t addr, uint32_t &out){
   std::cout << "PPB::read_word(" << std::hex << addr << std::dec << ")" << std::endl;
   switch(addr) {
     case 0xE000ED00: // CPUID
@@ -718,11 +1119,11 @@ PortState ARMv6MCore::PPB::read_word(uint32_t addr, uint32_t &out){
       out = 0;
       break;
   }
-  return PortState::SUCCESS; 
+  return PortState::SUCCESS;
 }
 PortState ARMv6MCore::PPB::write_byte(uint32_t addr, uint8_t in){ throw ARMv6M::BusFault(); }
 PortState ARMv6MCore::PPB::write_halfword(uint32_t addr, uint16_t in){ throw ARMv6M::BusFault(); }
-PortState ARMv6MCore::PPB::write_word(uint32_t addr, uint32_t in){ 
+PortState ARMv6MCore::PPB::write_word(uint32_t addr, uint32_t in){
   switch(addr) {
     case 0xE000ED00: // CPUID
       break;
@@ -769,5 +1170,5 @@ PortState ARMv6MCore::PPB::write_word(uint32_t addr, uint32_t in){
     case 0xE000ED54: // MMFR1
       break;
   }
-  return PortState::SUCCESS; 
+  return PortState::SUCCESS;
 }

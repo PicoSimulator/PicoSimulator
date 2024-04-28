@@ -107,7 +107,7 @@ public:
         void return_value(T value) requires (!std::is_void_v<T>) { 
           m_value = std::move(value); 
           }
-        void unhandled_exception() {  throw std::current_exception(); }
+        void unhandled_exception() {  std::rethrow_exception(std::current_exception()); }
         T m_value;
         std::coroutine_handle<> precursor;
     };

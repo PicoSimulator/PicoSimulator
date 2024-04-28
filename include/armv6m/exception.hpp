@@ -20,4 +20,10 @@ namespace ARMv6M{
   protected:
   private:
   };
+
+  class UnimplementedFault : public HardFault{
+  public:
+    UnimplementedFault() = delete;
+    UnimplementedFault(std::string && msg) : HardFault{std::move(msg)} {}
+  };
 }

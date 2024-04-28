@@ -4,7 +4,11 @@ target_sources(${TARGET} PRIVATE
   rp2040_bootloader.cpp
   armv6m/core.cpp
   armv6m/mpu.cpp
-  bus/apb.cpp
+  rp2040/bus/apb.cpp
+  rp2040/peri/xip.cpp
+  rp2040/peri/ssi.cpp
+  rp2040/pad.cpp
+  ext/io/net.cpp
 )
 
 target_include_directories(${TARGET} PRIVATE
