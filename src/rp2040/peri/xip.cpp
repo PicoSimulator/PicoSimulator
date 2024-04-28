@@ -82,6 +82,10 @@ Awaitable<void> XIP::write_halfword(uint32_t addr, uint16_t in)
 Awaitable<void> XIP::write_word(uint32_t addr, uint32_t in) 
 {
   switch(addr&0x0f00'0000) {
+    case 0x0000'0000:
+    case 0x0100'0000:
+    case 0x0200'0000:
+    case 0x0300'0000: co_return; // do nothing
     case 0x0400'0000:
     {
       switch(addr & 0x0000'3fff) {

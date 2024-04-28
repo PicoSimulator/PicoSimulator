@@ -48,6 +48,8 @@ namespace ARMv6M{
     bool CurrentModeIsPrivileged() const { return !m_threadMode || !(m_CONTROL & CONTROL::nPRIV); }
     void set_MSP(uint32_t val) { m_MSP = val; SP() = val; }
     void set_PSP(uint32_t val) { m_PSP = val; }
+    void BLXWritePC(uint32_t target) { m_nextPC = target; }
+    void BXWritePC(uint32_t target) { m_nextPC = target; }
 
     // enum ProcessorMode{
     //   ThreadMode = 0b10000,

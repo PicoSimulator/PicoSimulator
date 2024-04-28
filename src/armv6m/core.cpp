@@ -312,6 +312,19 @@ BusMaster ARMv6MCore::core_task()
     SETFLAGS_NZCV(result, carry, overflow);\
   }
 
+#define OPCODE_0001_101_sub(opcode) \
+  { \
+    uint32_t Rd = (opcode >> 16) & 0x7;\
+    uint32_t Rn = (opcode >> 19) & 0x7;\
+    uint32_t Rm = (opcode >> 22) & 0x7;\
+    uint32_t Rn_val = get_reg(Rn);\
+    uint32_t Rm_val = get_reg(Rm);\
+    auto [result, carry, overflow] = AddWithCarry(Rn_val, ~Rm_val, 1);\
+    std::cout << "SUB R" << Rd << ", R" << Rn << ", R" << Rm << " ; R" << Rd << " = " << result << std::endl;\
+    set_reg(Rd, result);\
+    SETFLAGS_NZCV(result, carry, overflow);\
+  }
+
 #define OPCODE_0001_110_add(opcode) \
   { \
     uint32_t Rd = (opcode >> 16) & 0x7;\
@@ -418,6 +431,17 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
       set_reg(Rdn, Rdn_val); \
       SETFLAGS_NZ(Rdn_val);\
     } break; \
+    case 0b0110:{\
+      uint32_t Rdn = (opcode >> 16) & 0x07;\
+      uint32_t Rm = (opcode >> 19) & 0x07;\
+      uint32_t Rdn_val = get_reg(Rdn);\
+      uint32_t Rm_val = get_reg(Rm);\
+      bool cin = m_APSR & APSR::CARRY; \
+      auto [result, cout, v] = AddWithCarry(Rdn_val, ~Rm_val, cin); \
+      std::cout << "SBC R"<< Rdn << ", R" << Rm << " ; R" << Rm << " = " << result << std::endl;\
+      set_reg(Rdn, result); \
+      SETFLAGS_NZCV(result, cout, v);\
+    } break; \
     case 0b1000:{\
       uint32_t Rn = (opcode >> 16) & 0x07;\
       uint32_t Rm = (opcode >> 19) & 0x07;\
@@ -491,7 +515,11 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
       }\
     } else if ((opcode & 1<<23) == 0) {\
       uint8_t Rm = (opcode>>19) & 0xf;\
-      m_nextPC = get_reg(Rm);\
+      BXWritePC(get_reg(Rm));\
+    } else {\
+      uint32_t Rm = (opcode>>19) & 0xf;\
+      LR() = m_nextPC;\
+      BLXWritePC(get_reg(Rm)); \
     }\
   }
 
@@ -507,12 +535,62 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
 
 #define OPCODE_0101_000_store(opcode) \
   { \
-    uint32_t imm5 = (instr >> 22) & 0x1F; \
+    uint32_t Rm = (instr >> 22) & 0x7; \
     uint32_t Rn = (instr >> 19) & 0x7; \
-    uint32_t Rm = instr & 0x7; \
-    uint32_t addr = get_reg(Rn) + imm5; \
-    uint32_t data = get_reg(Rm); \
+    uint32_t Rt = (instr >> 16) & 0x7; \
+    uint32_t addr = get_reg(Rn) + get_reg(Rm); \
+    uint32_t data = get_reg(Rt); \
     co_await m_mpu_bus_interface.write_word(addr, data); \
+  }
+
+#define OPCODE_0101_001_strh(opcode) \
+  { \
+    uint32_t Rm = (instr >> 22) & 0x7; \
+    uint32_t Rn = (instr >> 19) & 0x7; \
+    uint32_t Rt = (instr >> 16) & 0x7; \
+    uint32_t addr = get_reg(Rn) + get_reg(Rm); \
+    uint32_t data = get_reg(Rt); \
+    co_await m_mpu_bus_interface.write_halfword(addr, data); \
+  }
+
+#define OPCODE_0101_010_strb(opcode) \
+  { \
+    uint32_t Rm = (instr >> 22) & 0x7; \
+    uint32_t Rn = (instr >> 19) & 0x7; \
+    uint32_t Rt = (instr >> 16) & 0x7; \
+    uint32_t addr = get_reg(Rn) + get_reg(Rm); \
+    uint32_t data = get_reg(Rt); \
+    co_await m_mpu_bus_interface.write_byte(addr, data); \
+  }
+
+#define OPCODE_0101_100_ldr(opcode) \
+  { \
+    uint32_t Rm = (instr >> 22) & 0x7; \
+    uint32_t Rn = (instr >> 19) & 0x7; \
+    uint32_t Rt = (instr >> 16) & 0x7; \
+    uint32_t addr = get_reg(Rn) + get_reg(Rm); \
+    uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
+    set_reg(Rt, data); \
+  }
+
+#define OPCODE_0101_101_ldrh(opcode) \
+  { \
+    uint32_t Rm = (instr >> 22) & 0x7; \
+    uint32_t Rn = (instr >> 19) & 0x7; \
+    uint32_t Rt = (instr >> 16) & 0x7; \
+    uint32_t addr = get_reg(Rn) + get_reg(Rm); \
+    uint32_t data = co_await m_mpu_bus_interface.read_halfword(addr); \
+    set_reg(Rt, data); \
+  }
+
+#define OPCODE_0101_110_ldrb(opcode) \
+  { \
+    uint32_t Rm = (instr >> 22) & 0x7; \
+    uint32_t Rn = (instr >> 19) & 0x7; \
+    uint32_t Rt = (instr >> 16) & 0x7; \
+    uint32_t addr = get_reg(Rn) + get_reg(Rm); \
+    uint32_t data = co_await m_mpu_bus_interface.read_byte(addr); \
+    set_reg(Rt, data); \
   }
 
 #define OPCODE_0110_0xx_store(opcode) \
@@ -607,7 +685,7 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   { \
     uint32_t imm32 = (opcode >> 14) & 0x3FC; \
     uint32_t Rd = (opcode >> 24) & 0x07; \
-    uint32_t addr = PC() & ~0x03 + imm32; \
+    uint32_t addr = (PC() & ~0x03) + imm32 + 4; \
     std::cout << "ADD R" << Rd << ", PC, #" << imm32 << "( " << std::hex << addr << std::dec << " )" << std::endl;\
     set_reg(Rd, addr);\
   }
@@ -755,8 +833,23 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
       /*BKPT*/\
       uint32_t imm8 = (opcode >> 16) & 0xFF; \
       std::cout << "BKPT #" << imm8 << std::endl;\
-      throw HardFault{"BKPT not implemented"};\
+      /*throw HardFault{"BKPT not implemented"};*/\
     }\
+  }
+
+#define OPCODE_1100_0xx_stm(opcode) \
+  { \
+    uint32_t Rn = (opcode >> 24) & 0x7;\
+    uint32_t reg_list = (opcode >> 16) & 0xff;\
+    bool wback = true;\
+    uint32_t Rn_val = get_reg(Rn);\
+    std::cout << "STMIA R" << Rn << (wback?"! {":" {") << std::bitset<8>{reg_list} << "}" << std::endl;\
+    for (int i = 0; i < 8; i++) {\
+      if ((reg_list & (1<<i)) == 0) continue;\
+      co_await m_mpu_bus_interface.write_word(Rn_val, get_reg(i)); \
+      Rn_val += 4;\
+    }\
+    if (wback) set_reg(Rn, Rn_val);\
   }
 
 #define OPCODE_1100_1xx_ldm(opcode) \
@@ -765,7 +858,7 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
     uint32_t reg_list = (opcode >> 16) & 0xff;\
     bool wback = (reg_list & (1<<Rn)) == 0;\
     uint32_t Rn_val = get_reg(Rn);\
-    std::cout << "LDM R" << Rn << (wback?" {":"! {") << std::bitset<8>{reg_list} << "}" << std::endl;\
+    std::cout << "LDMIA R" << Rn << (wback?"! {":" {") << std::bitset<8>{reg_list} << "}" << std::endl;\
     for (int i = 0; i < 8; i++) {\
       if ((reg_list & (1<<i)) == 0) continue;\
       set_reg(i, co_await m_mpu_bus_interface.read_word(Rn_val));\
@@ -919,7 +1012,7 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*0001_010*/ o(0b0001'010, OPCODE_UNDEFINED) \
   /*0001_011*/ o(0b0001'011, OPCODE_UNDEFINED) \
   /*0001_100*/ o(0b0001'100, OPCODE_0001_100_add) \
-  /*0001_101*/ o(0b0001'101, OPCODE_UNDEFINED) \
+  /*0001_101*/ o(0b0001'101, OPCODE_0001_101_sub) \
   /*0001_110*/ o(0b0001'110, OPCODE_0001_110_add) \
   /*0001_111*/ o(0b0001'111, OPCODE_0001_111_sub) \
   /*0010_000*/ o(0b0010'000, OPCODE_0010_0xx_mov) \
@@ -939,7 +1032,7 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*0011_110*/ o(0b0011'110, OPCODE_0011_1xx_sub) \
   /*0011_111*/ o(0b0011'111, OPCODE_0011_1xx_sub) \
   /*0100_000*/ o(0b0100'000, OPCODE_0100_00x_arith) \
-  /*0100_011*/ o(0b0100'001, OPCODE_0100_00x_arith) \
+  /*0100_001*/ o(0b0100'001, OPCODE_0100_00x_arith) \
   /*0100_010*/ o(0b0100'010, OPCODE_UNDEFINED) \
   /*0100_001*/ o(0b0100'011, OPCODE_0100_011_mov) \
   /*0100_100*/ o(0b0100'100, OPCODE_0100_1xx_load) \
@@ -947,12 +1040,12 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*0100_110*/ o(0b0100'110, OPCODE_0100_1xx_load) \
   /*0100_111*/ o(0b0100'111, OPCODE_0100_1xx_load) \
   /*0101_000*/ o(0b0101'000, OPCODE_0101_000_store) \
-  /*0101_001*/ o(0b0101'001, OPCODE_UNDEFINED) \
-  /*0101_010*/ o(0b0101'010, OPCODE_UNDEFINED) \
+  /*0101_001*/ o(0b0101'001, OPCODE_0101_001_strh) \
+  /*0101_010*/ o(0b0101'010, OPCODE_0101_010_strb) \
   /*0101_011*/ o(0b0101'011, OPCODE_UNDEFINED) \
-  /*0101_100*/ o(0b0101'100, OPCODE_UNDEFINED) \
-  /*0101_101*/ o(0b0101'101, OPCODE_UNDEFINED) \
-  /*0101_110*/ o(0b0101'110, OPCODE_UNDEFINED) \
+  /*0101_100*/ o(0b0101'100, OPCODE_0101_100_ldr) \
+  /*0101_101*/ o(0b0101'101, OPCODE_0101_101_ldrh) \
+  /*0101_110*/ o(0b0101'110, OPCODE_0101_110_ldrb) \
   /*0101_111*/ o(0b0101'111, OPCODE_UNDEFINED) \
   /*0110_000*/ o(0b0110'000, OPCODE_0110_0xx_store) \
   /*0110_001*/ o(0b0110'001, OPCODE_0110_0xx_store) \
@@ -1002,10 +1095,10 @@ std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry
   /*1011_101*/ o(0b1011'101, OPCODE_1011_101_rev) \
   /*1011_110*/ o(0b1011'110, OPCODE_1011_110_popm) \
   /*1011_111*/ o(0b1011'111, OPCODE_1011_111_misc) \
-  /*1100_000*/ o(0b1100'000, OPCODE_UNDEFINED) \
-  /*1100_001*/ o(0b1100'001, OPCODE_UNDEFINED) \
-  /*1100_010*/ o(0b1100'010, OPCODE_UNDEFINED) \
-  /*1100_011*/ o(0b1100'011, OPCODE_UNDEFINED) \
+  /*1100_000*/ o(0b1100'000, OPCODE_1100_0xx_stm) \
+  /*1100_001*/ o(0b1100'001, OPCODE_1100_0xx_stm) \
+  /*1100_010*/ o(0b1100'010, OPCODE_1100_0xx_stm) \
+  /*1100_011*/ o(0b1100'011, OPCODE_1100_0xx_stm) \
   /*1100_100*/ o(0b1100'100, OPCODE_1100_1xx_ldm) \
   /*1100_101*/ o(0b1100'101, OPCODE_1100_1xx_ldm) \
   /*1100_110*/ o(0b1100'110, OPCODE_1100_1xx_ldm) \
