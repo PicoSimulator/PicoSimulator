@@ -29,9 +29,7 @@ namespace RP2040{
   protected:
     virtual PortState read_word_internal(uint32_t addr, uint32_t &out) final override;
     virtual PortState write_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual PortState xor_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual PortState set_bits_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual PortState clear_bits_word_internal(uint32_t addr, uint32_t in) final override;
+    virtual uint32_t read_word_internal_pure(uint32_t addr) const final override;
   private:
     friend class SSIFiFoAux;
     RP2040 &m_rp2040;
@@ -93,9 +91,7 @@ namespace RP2040{
   protected:
     virtual PortState read_word_internal(uint32_t addr, uint32_t &out) final override;
     virtual PortState write_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual PortState xor_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual PortState set_bits_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual PortState clear_bits_word_internal(uint32_t addr, uint32_t in) final override;
+    virtual uint32_t read_word_internal_pure(uint32_t addr) const final override;
   private:
     SSI &m_ssi;
   };

@@ -290,6 +290,7 @@ PortState RP2040::RP2040::IOPort::read_halfword(uint32_t addr, uint16_t &out){
 }
 PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){ 
   // std::cout << "IOPort::read_word(" << std::hex << addr << std::dec << ")" << std::endl;
+  #define SPINLOCKS_EVAL(num) case (0xd000'0100 + 4*num): out = m_spinlocks.try_lock(num); break;
   switch(addr) {
     case 0xd000'0000: out = m_cpuid; break;
     case 0xd000'0008: out = 0x0000'0002; break; // force CS high to enable flash boot
@@ -299,14 +300,17 @@ PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){
     case 0xd000'0070: out = m_divider.get_quotient(); break;
     case 0xd000'0074: out = m_divider.get_remainder(); break;
     case 0xd000'0078: out = m_divider.get_status(); break;
+    ENUM_SPINLOCKS(SPINLOCKS_EVAL)
     default: throw ARMv6M::BusFault{addr};
   }
+  #undef SPINLOCKS_EVAL
   return PortState::SUCCESS; 
 }
 PortState RP2040::RP2040::IOPort::write_byte(uint32_t addr, uint8_t in){ throw ARMv6M::BusFault(); }
 PortState RP2040::RP2040::IOPort::write_halfword(uint32_t addr, uint16_t in){ throw ARMv6M::BusFault(); }
 PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){ 
   // std::cout << "IOPort::write_word(" << std::hex << addr << ", " << in << std::dec << ")" << std::endl;
+  #define SPINLOCKS_EVAL(num) case (0xd000'0100 + 4*num): m_spinlocks.unlock(num); break;
   switch(addr) {
     case 0xd000'0000: break;
     case 0xd000'0050: 
@@ -318,7 +322,10 @@ PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){
     case 0xd000'0064: m_divider.set_udivisor(in); break;
     case 0xd000'0068: m_divider.set_sdividend(in); break;
     case 0xd000'006c: m_divider.set_sdivisor(in); break;
+    ENUM_SPINLOCKS(SPINLOCKS_EVAL)
+
     default: throw ARMv6M::BusFault{addr};
   }
+  #undef SPINLOCKS_EVAL
   return PortState::SUCCESS; 
 }

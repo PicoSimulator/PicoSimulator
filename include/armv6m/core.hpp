@@ -26,6 +26,8 @@ namespace ARMv6M{
     void tick() override;
     virtual void reset() override;
     BusMaster *run() { return &m_core_task; }
+    const uint32_t &VTOR() const { return m_VTOR; }
+    uint32_t &VTOR() { return m_VTOR; }
   protected:
   private:
     int instruction_count = 0;
@@ -85,6 +87,7 @@ namespace ARMv6M{
     uint32_t m_EPSR;
     uint32_t m_PRIMASK;
     uint32_t m_CONTROL;
+    uint32_t m_VTOR;
     enum CONTROL{
       nPRIV = 1 << 0,
       SPSEL = 1 << 1,

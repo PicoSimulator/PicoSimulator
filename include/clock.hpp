@@ -18,12 +18,12 @@ public:
 protected:
   void do_tick();
 private:
-  std::list<IClockable*> m_clock_sinks;
+  std::vector<IClockable*> m_clock_sinks;
 };
 
 class ClockTransform : public Clock, public IClockable{};
 
-class ClockMux : public ClockTransform {
+class ClockMux final : public ClockTransform {
 public:
   void tick();
   void set_source_index(uint8_t i);
@@ -33,7 +33,7 @@ private:
   std::vector<Clock*> m_clock_sources;
 };
 
-class ClockDiv : public ClockTransform {
+class ClockDiv final : public ClockTransform {
 public:
   void tick();
 protected:

@@ -5,12 +5,15 @@
   o(0x0000'4000, m_syscfg, SYNC, NOTICK) \
   o(0x0000'8000, m_clocks, SYNC, NOTICK) \
   o(0x0000'c000, m_resets, SYNC, NOTICK) \
+  o(0x0001'4000, m_io_b0, SYNC, NOTICK) \
   o(0x0001'8000, m_io_qspi, SYNC, NOTICK) \
   o(0x0001'c000, m_pads_b0, SYNC, NOTICK) \
   o(0x0002'0000, m_pads_qspi, SYNC, NOTICK) \
   o(0x0002'4000, m_xosc, SYNC, NOTICK) \
   o(0x0002'8000, m_pll_sys, SYNC, NOTICK) \
   o(0x0002'c000, m_pll_usb, SYNC, NOTICK) \
+  o(0x0003'4000, m_uart0, SYNC, NOTICK) \
+  o(0x0003'8000, m_uart1, SYNC, NOTICK) \
   o(0x0005'4000, m_timer, SYNC, NOTICK) \
   o(0x0005'8000, m_watchdog, SYNC, NOTICK) \
   o(0x0006'4000, m_vreg, SYNC, NOTICK) \
@@ -44,7 +47,7 @@ Awaitable<uint32_t> RP2040::APB::read_word(uint32_t addr)
   #define ASYNC(fun, addr, out) out = co_await fun(addr) 
   
   uint32_t out;
-  switch(addr & 0x000f'c000) {
+  switch(addr & 0x00ff'c000) {
     APB_PERIPHERALS(ENUM_PERIPHERAL)
     default:
       throw ARMv6M::BusFault{addr};
@@ -64,7 +67,7 @@ Awaitable<void> RP2040::APB::write_halfword(uint32_t addr, uint16_t in)
 }
 Awaitable<void> RP2040::APB::write_word(uint32_t addr, uint32_t in)
 {
-  #define ENUM_PERIPHERAL(peri_addr, name, synch, _) case peri_addr: synch (name.read_word, addr, in); break;
+  #define ENUM_PERIPHERAL(peri_addr, name, synch, _) case peri_addr: synch (name.write_word, addr, in); break;
   #define SYNC(fun, addr, in) fun(addr, in)
   #define ASYNC(fun, addr, in) co_await fun(addr, in) 
   

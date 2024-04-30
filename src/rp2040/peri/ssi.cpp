@@ -47,16 +47,7 @@ PortState SSI::write_word_internal(uint32_t addr, uint32_t in)
   }
   return PortState::SUCCESS;
 }
-
-PortState SSI::xor_word_internal(uint32_t addr, uint32_t in)
+uint32_t SSI::read_word_internal_pure(uint32_t addr) const
 {
-  return PortState::FAULT;
-}
-PortState SSI::set_bits_word_internal(uint32_t addr, uint32_t in)
-{
-  return PortState::FAULT;
-}
-PortState SSI::clear_bits_word_internal(uint32_t addr, uint32_t in)
-{
-  return PortState::FAULT;
+  return 0;
 }

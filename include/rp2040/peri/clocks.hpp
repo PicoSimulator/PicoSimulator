@@ -5,6 +5,46 @@
 class Clocks final : public IPeripheralPort{
 public:
 protected:
+  virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
+  {
+    std::cout << "Clocks::read_word_internal(0x" << std::hex << addr << ")" << std::dec << std::endl;
+    out = 0xffff'ffff; // hack
+    switch(addr & 0xfc) {
+      case CLK_REF_CTRL: out = m_clk_ref_ctrl; break;
+      case CLK_REF_SELECTED: out = m_clk_ref_selected; break; // CLK_REF_SELECTED
+      case CLK_SYS_CTRL: out = m_clk_sys_ctrl; break;
+      case CLK_SYS_SELECTED: out = m_clk_sys_selected; break; // CLK_SYS_SELECTED
+      case CLK_PERI_CTRL: ; break;
+      case CLK_PERI_SELECTED: out = 1; break; // CLK_PERI_SELECTED has no glitchless mux
+    }
+    return PortState::SUCCESS;
+  }
+  virtual uint32_t read_word_internal_pure(uint32_t addr) const override final
+  {
+    std::cout << "Clocks::read_word_internal_pure(0x" << std::hex << addr << ")" << std::dec << std::endl;
+    uint32_t out = 0xffff'ffff; // hack
+    switch(addr & 0xfc) {
+      case CLK_REF_CTRL: out = m_clk_ref_ctrl; break;
+      case CLK_REF_SELECTED: out = m_clk_ref_selected; break; // CLK_REF_SELECTED
+      case CLK_SYS_CTRL: out = m_clk_sys_ctrl; break;
+      case CLK_SYS_SELECTED: out = m_clk_sys_selected; break; // CLK_SYS_SELECTED
+      case CLK_PERI_CTRL: ; break;
+      case CLK_PERI_SELECTED: out = 1; break; // CLK_PERI_SELECTED has no glitchless mux
+    }
+    return out;
+  }
+  virtual PortState write_word_internal(uint32_t addr, uint32_t in) override final
+  {
+    std::cout << "Clocks::write_word_internal(0x" << std::hex << addr << ", 0x" << in << ")" << std::dec << std::endl;
+    switch(addr & 0xfc) {
+      case CLK_REF_CTRL: m_clk_ref_ctrl = in; m_clk_ref_selected = (1 << (in & 0x03)); break;
+      case CLK_SYS_CTRL: m_clk_sys_ctrl = in; m_clk_sys_selected = (1 << (in & 0x01)); break;
+      case CLK_PERI_CTRL: ; break;
+    }
+    return PortState::SUCCESS;
+  }
+
+private:
   enum Register{
     CLK_GPOUT0_CTRL = 0x00,
     CLK_GPOUT0_DIV = 0x04,
@@ -57,32 +97,15 @@ protected:
     INTF = 0xc0,
     INTS = 0xc4,
   };
-  virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
-  {
-    out = 0;
-    switch(addr & 0xfc) {
-      case 0x38: out = 1; break; // CLK_REF_SELECTED
-      case 0x44: out = 1; break; // CLK_SYS_SELECTED
-    }
-    return PortState::SUCCESS;
-  }
-  virtual PortState write_word_internal(uint32_t addr, uint32_t in) override final
-  {
-    return PortState::SUCCESS;
-  }
-  virtual PortState xor_word_internal(uint32_t addr, uint32_t in) override final
-  {
-    return PortState::FAULT;
-  }
-  virtual PortState set_bits_word_internal(uint32_t addr, uint32_t in) override final
-  {
-    return PortState::FAULT;
-  }
-  virtual PortState clear_bits_word_internal(uint32_t addr, uint32_t in) override final
-  {
-    return PortState::FAULT;
-  }
 
-private:
+  uint32_t m_clk_ref_ctrl = 0;
+  uint32_t m_clk_ref_selected = 1;
+  uint32_t m_clk_sys_ctrl = 0;
+  uint32_t m_clk_sys_selected = 1;
+  uint32_t m_clk_peri_selected = 1;
+
+
+
+
 
 };

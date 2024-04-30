@@ -17,6 +17,7 @@ namespace RP2040 {
 #include "rp2040/bus/apb.hpp"
 #include "rp2040/core/fifo.hpp"
 #include "rp2040/core/divider.hpp"
+#include "rp2040/core/spinlock.hpp"
 #include "rp2040/peri/resets.hpp"
 #include "rp2040/peri/vreg.hpp"
 #include "rp2040/peri/clocks.hpp"
@@ -51,6 +52,7 @@ namespace RP2040{
     uint32_t m_cpuid;
     Core::FiFo &m_tx_fifo, &m_rx_fifo;
     Core::Divider m_divider;
+    Core::Spinlocks m_spinlocks;
       // read fifo
       // write fifo
       // spinlocks

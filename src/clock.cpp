@@ -1,5 +1,6 @@
 #include "clock.hpp"
 #include <cassert>
+#include <algorithm>
 
 void Clock::sink_add(IClockable *c) {
   if(!this) return;
@@ -8,7 +9,7 @@ void Clock::sink_add(IClockable *c) {
 
 void Clock::sink_remove(IClockable *c) {
   if(!this) return;
-  m_clock_sinks.remove(c);
+  m_clock_sinks.erase(std::remove(m_clock_sinks.begin(), m_clock_sinks.end(), c));
 }
 
 void Clock::do_tick() {

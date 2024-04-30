@@ -28,17 +28,9 @@ protected:
   {
     return PortState::FAULT;
   }
-  virtual PortState xor_word_internal(uint32_t addr, uint32_t in) override final
+  virtual uint32_t read_word_internal_pure(uint32_t addr) const override final
   {
-    return PortState::FAULT;
-  }
-  virtual PortState set_bits_word_internal(uint32_t addr, uint32_t in) override final
-  {
-    return PortState::FAULT;
-  }
-  virtual PortState clear_bits_word_internal(uint32_t addr, uint32_t in) override final
-  {
-    return PortState::FAULT;
+    return 0;
   }
 
 private:

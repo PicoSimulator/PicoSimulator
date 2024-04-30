@@ -5,6 +5,7 @@
 #include "rp2040/peri/vreg.hpp"
 #include "rp2040/peri/clocks.hpp"
 #include "rp2040/peri/syscfg.hpp"
+#include "rp2040/peri/io_bank0.hpp"
 #include "rp2040/peri/pads_bank0.hpp"
 #include "rp2040/peri/io_qspi.hpp"
 #include "rp2040/peri/pads_qspi.hpp"
@@ -13,6 +14,7 @@
 #include "rp2040/peri/xosc.hpp"
 #include "rp2040/peri/timer.hpp"
 #include "rp2040/peri/pll.hpp"
+#include "rp2040/peri/uart.hpp"
 
 namespace RP2040{
 
@@ -53,6 +55,7 @@ namespace RP2040{
     VReg &m_vreg;
     Clocks &m_clocks;
     SysCfg &m_syscfg;
+    IOBank0 m_io_b0;
     PadsBank0 m_pads_b0;
     Watchdog m_watchdog;
     TBMan m_tbman;
@@ -61,5 +64,6 @@ namespace RP2040{
     XOSC m_xosc;
     Timer m_timer;
     PLL m_pll_sys, m_pll_usb;
+    UART m_uart0, m_uart1;
   };
 }

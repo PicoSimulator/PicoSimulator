@@ -27,24 +27,23 @@ public:
   }
   virtual PortState write_word(uint32_t addr, uint32_t in) override final
   {
+    std::cout << "IPeripheralPort::write_word(0x" << std::hex << addr << ", 0x" << in << ")" << std::dec << std::endl;
     switch(addr&0x0000'3000) {
       case 0x0000'0000:
         return write_word_internal(addr, in);
       case 0x0000'1000:
-        return xor_word_internal(addr, in);
+        return write_word_internal(addr, in ^ read_word_internal_pure(addr));
       case 0x0000'2000:
-        return set_bits_word_internal(addr, in);
+        return write_word_internal(addr, in | read_word_internal_pure(addr));
       case 0x0000'3000:
-        return clear_bits_word_internal(addr, in);
+        return write_word_internal(addr, ~in & read_word_internal_pure(addr));
     }
     return PortState::FAULT;
   }
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) = 0;
   virtual PortState write_word_internal(uint32_t addr, uint32_t in) = 0;
-  virtual PortState xor_word_internal(uint32_t addr, uint32_t in) = 0;
-  virtual PortState set_bits_word_internal(uint32_t addr, uint32_t in) = 0;
-  virtual PortState clear_bits_word_internal(uint32_t addr, uint32_t in) = 0;
+  virtual uint32_t read_word_internal_pure(uint32_t addr) const = 0;
 private:
 
 };

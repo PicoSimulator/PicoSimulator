@@ -2,7 +2,7 @@
 
 #include "rp2040/peripheral.hpp"
 
-class PadsQSPI final : public IPeripheralPort{
+class IOBank0 final : public IPeripheralPort{
 public:
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final

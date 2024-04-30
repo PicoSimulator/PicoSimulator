@@ -49,7 +49,7 @@ BusMaster ARMv6MCore::core_task()
     for (int i = 0; i < 12; i++) {
       m_regs[i] = 0; // do we actually do this?
     }
-    uint32_t vectortable = 0;
+    uint32_t vectortable = VTOR() = 0;
     m_threadMode = true;
     // LR() = UNKNOWN;
     m_regs[15] = 1;
@@ -279,7 +279,7 @@ PortState ARMv6MCore::PPB::read_word(uint32_t addr, uint32_t &out){
       out = 0;
       break;
     case 0xE000ED08: // VTOR
-      out = 0;
+      out = m_core.VTOR();
       break;
     case 0xE000ED0C: // AIRCR
       out = 0;
@@ -350,6 +350,7 @@ PortState ARMv6MCore::PPB::write_word(uint32_t addr, uint32_t in){
     case 0xE000ED04: // ICSR
       break;
     case 0xE000ED08: // VTOR
+      m_core.VTOR() = in;
       break;
     case 0xE000ED0C: // AIRCR
       break;

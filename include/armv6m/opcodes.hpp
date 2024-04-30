@@ -11,8 +11,8 @@
  * - core: the core object to operate on
 */
 
-#define FMT_op16(opcode) std::hex << std::setw(4) << std::setfill('0') << ((opcode >> 16) & 0xffff) << "     " << std::dec
-#define FMT_op32(opcode) std::hex << std::setw(4) << std::setfill('0') << ((opcode >> 16) & 0xffff) << " " << (opcode & 0xffff) << std::dec
+#define FMT_op16(opcode) std::hex << std::setw(4) << std::setfill('0') << ((opcode >> 16) & 0xffff) << "      " << std::dec
+#define FMT_op32(opcode) std::hex << std::setw(4) << std::setfill('0') << ((opcode >> 16) & 0xffff) << " " << (opcode & 0xffff) << " " << std::dec
 
 #define FMT_dis_RdRmImm5(mnem, Rd, Rm, imm5) (mnem) << " " << FMT_reg((Rd)) << ", " << FMT_reg((Rm)) << ", #" << (imm5)
 #define FMT_dis_RdnRm(mnem, Rdn, Rm) (mnem) << " " << FMT_reg((Rdn)) << ", " << FMT_reg((Rm))
@@ -108,9 +108,36 @@
     })\
     do_exec({\
       uint32_t Rm_val = core->get_reg(Rm);\
-      bool carry_out = Rm_val & (1<<(32-imm5));\
+      bool carry_out = Rm_val & (1 << imm5);\
       if (imm5 != 0) {\
         Rm_val >>= imm5;\
+      }\
+      core->set_reg(Rd, Rm_val);\
+      SETFLAGS_NZC(Rm_val, carry_out);\
+      do_trace({\
+        std::cout << FMT_reg(Rd) << ":=0x" << FMT_hex(Rm_val)  \
+                  << ";FLAGS=" << FMT_flags(m_APSR)\
+                  << std::endl;\
+      })\
+    })\
+  }
+
+#define OPCODE_0001_0xx_asr(opcode, do_disasm, do_exec, do_trace, core) \
+  {\
+    uint32_t Rd = (opcode >> 16) & 0x07;\
+    uint32_t Rm = (opcode >> 19) & 0x07;\
+    uint32_t imm5 = (opcode >> 22) & 0x1f;\
+    do_disasm({ \
+      std::cout << FMT_op16(opcode)\
+                << FMT_dis_RdRmImm5("ASR", Rd, Rm, imm5)\
+                << std::endl;\
+    })\
+    do_exec({\
+      uint32_t Rm_val = core->get_reg(Rm);\
+      bool carry_out = Rm_val & (1<<imm5);\
+      if (imm5 != 0) {\
+        Rm_val >>= imm5;\
+        Rm_val = SignExtend(Rm_val, 32 - imm5); \
       }\
       core->set_reg(Rd, Rm_val);\
       SETFLAGS_NZC(Rm_val, carry_out);\
@@ -513,6 +540,23 @@
         })\
       })\
     } break;\
+    case 0b1101:{\
+      uint32_t Rdm = (opcode >> 16) & 0x7;\
+      uint32_t Rn = (opcode >> 19) & 0x7;\
+      do_disasm({std::cout << FMT_op16(opcode) << FMT_dis_RdnRm("MULS", Rdm, Rn) << std::endl; })\
+      do_exec({\
+        uint32_t Rdm_val = get_reg(Rdm);\
+        uint32_t Rn_val = get_reg(Rn);\
+        Rdm_val *= Rn_val;\
+        set_reg(Rdm, Rdm_val);\
+        SETFLAGS_NZ(Rdm_val);\
+        do_trace({\
+          std::cout << FMT_reg(Rdm) << ":=0x" << FMT_hex(Rdm_val)  \
+                    << ";FLAGS=" << FMT_flags(m_APSR) \
+                    << std::endl;\
+        })\
+      })\
+    } break;\
     case 0b1110:{\
       uint32_t Rd = (opcode >> 16) & 0x7;\
       uint32_t Rn = (opcode >> 19) & 0x7;\
@@ -685,8 +729,8 @@
       uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
       set_reg(Rt, data); \
       do_trace({\
-          std::cout << FMT_reg(Rt) << ":=MemU[" << addr << ",4]=" \
-                    << std::hex << data \
+          std::cout << FMT_reg(Rt) << ":=MemU[" << FMT_hexw(addr, 8) << ",4]=" \
+                    << FMT_hex(data) \
                     << std::endl;\
       })\
     })\
@@ -1528,10 +1572,10 @@
   /*0000_101*/ o(0b0000'101, OPCODE_0000_1xx_lsr) \
   /*0000_110*/ o(0b0000'110, OPCODE_0000_1xx_lsr) \
   /*0000_111*/ o(0b0000'111, OPCODE_0000_1xx_lsr) \
-  /*0001_000*/ o(0b0001'000, OPCODE_UNDEFINED) \
-  /*0001_001*/ o(0b0001'001, OPCODE_UNDEFINED) \
-  /*0001_010*/ o(0b0001'010, OPCODE_UNDEFINED) \
-  /*0001_011*/ o(0b0001'011, OPCODE_UNDEFINED) \
+  /*0001_000*/ o(0b0001'000, OPCODE_0001_0xx_asr) \
+  /*0001_001*/ o(0b0001'001, OPCODE_0001_0xx_asr) \
+  /*0001_010*/ o(0b0001'010, OPCODE_0001_0xx_asr) \
+  /*0001_011*/ o(0b0001'011, OPCODE_0001_0xx_asr) \
   /*0001_100*/ o(0b0001'100, OPCODE_0001_100_add) \
   /*0001_101*/ o(0b0001'101, OPCODE_0001_101_sub) \
   /*0001_110*/ o(0b0001'110, OPCODE_0001_110_add) \

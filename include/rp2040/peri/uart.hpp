@@ -2,7 +2,7 @@
 
 #include "rp2040/peripheral.hpp"
 
-class PadsQSPI final : public IPeripheralPort{
+class UART final : public IPeripheralPort{
 public:
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
@@ -12,6 +12,9 @@ protected:
   }
   virtual PortState write_word_internal(uint32_t addr, uint32_t in) override final
   {
+    if ((addr & 0xff) == 0x00) {
+      std::cout << "UART DR: " << std::hex << in << "  (" << char(in) << ")" << std::endl;
+    }
     return PortState::SUCCESS;
   }
   virtual uint32_t read_word_internal_pure(uint32_t addr) const override final
