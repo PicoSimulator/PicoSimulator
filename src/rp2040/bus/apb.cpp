@@ -9,6 +9,9 @@
   o(0x0001'c000, m_pads_b0, SYNC, NOTICK) \
   o(0x0002'0000, m_pads_qspi, SYNC, NOTICK) \
   o(0x0002'4000, m_xosc, SYNC, NOTICK) \
+  o(0x0002'8000, m_pll_sys, SYNC, NOTICK) \
+  o(0x0002'c000, m_pll_usb, SYNC, NOTICK) \
+  o(0x0005'4000, m_timer, SYNC, NOTICK) \
   o(0x0005'8000, m_watchdog, SYNC, NOTICK) \
   o(0x0006'4000, m_vreg, SYNC, NOTICK) \
   o(0x0006'c000, m_tbman, SYNC, NOTICK) \

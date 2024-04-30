@@ -35,7 +35,7 @@ void RP2040::RP2040::run()
   while (ticks++ < 100000) {
     std::cout << "\nTICK " << ticks << std::endl;
     m_cores[0].tick();
-    m_cores[1].tick();
+    // m_cores[1].tick();
     // m_dma.tick();
     m_ahb.tick();
     // AHBLite.tick();
@@ -68,7 +68,7 @@ std::tuple<RP2040::RP2040::AHB::BusDevice, uint32_t> RP2040::RP2040::AHB::lookup
           BusDevice::SRAM5, 
           };
       if (addr < 0x2004'0000) {
-        return {srams[(addr >> 2) & 0b11], (addr>>2) & ~0b11 | addr & 0b11};
+        return {srams[(addr >> 2) & 0b11], (addr>>2) & 0x0000'fffc | addr & 0x3};
       } else if (addr < 0x2004'2000) {
         return {srams[4+(addr>>12) & 0b11], addr & 0x0000'0fff};
       } else if (addr >= 0x2100'0000) {
@@ -193,6 +193,7 @@ Awaitable<void> RP2040::RP2040::AHB::write_word(uint32_t addr, uint32_t val)
   auto dev = std::get<0>(devoffset);
   auto offset = std::get<1>(devoffset);
   co_await registerBusOp(dev);
+  std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
   switch(dev) {
     case BusDevice::ROM: ((uint32_t*) /* [8192] */(m_rp2040.m_ROM.begin()))[offset/4] = val; break;
     case BusDevice::SRAM0: ((uint32_t*) /* [32768] */(m_rp2040.m_SRAM0.begin()))[offset/4] = val; break;
@@ -275,8 +276,18 @@ void RP2040::RP2040::AHB::tick()
   }
 }
 
-PortState RP2040::RP2040::IOPort::read_byte(uint32_t addr, uint8_t &out){ throw ARMv6M::BusFault(); }
-PortState RP2040::RP2040::IOPort::read_halfword(uint32_t addr, uint16_t &out){ throw ARMv6M::BusFault(); }
+PortState RP2040::RP2040::IOPort::read_byte(uint32_t addr, uint8_t &out){ 
+  uint32_t out2;
+  PortState ret = read_word(addr, out2);
+  out = out2;
+  return ret;
+}
+PortState RP2040::RP2040::IOPort::read_halfword(uint32_t addr, uint16_t &out){ 
+  uint32_t out2;
+  PortState ret = read_word(addr, out2);
+  out = out2;
+  return ret;
+}
 PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){ 
   // std::cout << "IOPort::read_word(" << std::hex << addr << std::dec << ")" << std::endl;
   switch(addr) {

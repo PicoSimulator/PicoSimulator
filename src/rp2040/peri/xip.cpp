@@ -14,7 +14,13 @@ void XIP::tick() {
 
 Awaitable<uint8_t> XIP::read_byte(uint32_t addr) 
 {
-  throw ARMv6M::UnimplementedFault{"XIP::read_byte"};
+  switch(addr&0x0f00'0000) {
+    case 0x0000'0000:
+    case 0x0100'0000:
+    case 0x0200'0000:
+    case 0x0300'0000:
+      co_return ((uint8_t*)m_flash.begin())[(addr&0x00ff'ffff)/2];
+  }
 }
 
 Awaitable<uint16_t> XIP::read_halfword(uint32_t addr) 

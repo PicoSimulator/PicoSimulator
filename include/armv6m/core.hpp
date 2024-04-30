@@ -9,6 +9,7 @@
 #include <coroutine>
 #include <utility>
 #include <string>
+#include <tuple>
 
 namespace ARMv6M{
 
@@ -45,11 +46,28 @@ namespace ARMv6M{
 
     Awaitable<void> exec_instr(uint32_t instr);
 
+    
+    static uint32_t SignExtend(uint32_t v, int bits) { 
+      return v | (- (v & (1 << (bits - 1))));
+    }
+    static std::tuple<uint32_t, bool, bool> AddWithCarry(uint32_t a, uint32_t b, bool carry_in)
+    {
+      uint64_t result = (uint64_t)a + (uint64_t)b + (uint64_t)carry_in;
+      bool carry_out = result & 0x100000000;
+      bool overflow = ((a & 0x80000000) == (b & 0x80000000)) && ((a & 0x80000000) != (result & 0x80000000));
+      return {result, carry_out, overflow};
+    }
+
     bool CurrentModeIsPrivileged() const { return !m_threadMode || !(m_CONTROL & CONTROL::nPRIV); }
     void set_MSP(uint32_t val) { m_MSP = val; SP() = val; }
     void set_PSP(uint32_t val) { m_PSP = val; }
+    // TODO: Interworking!
     void BLXWritePC(uint32_t target) { m_nextPC = target; }
     void BXWritePC(uint32_t target) { m_nextPC = target; }
+    void BranchTo(uint32_t target) { m_nextPC = target | PC() & 1; }
+    void BranchWritePC(uint32_t target) { BranchTo(target&~1); }
+    void ALUWritePC(uint32_t target) { BranchWritePC(target); }
+    void LoadWritePC(uint32_t target) { BXWritePC(target); }
 
     // enum ProcessorMode{
     //   ThreadMode = 0b10000,

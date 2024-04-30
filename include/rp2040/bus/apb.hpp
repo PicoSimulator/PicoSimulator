@@ -11,6 +11,8 @@
 #include "rp2040/peri/watchdog.hpp"
 #include "rp2040/peri/tbman.hpp"
 #include "rp2040/peri/xosc.hpp"
+#include "rp2040/peri/timer.hpp"
+#include "rp2040/peri/pll.hpp"
 
 namespace RP2040{
 
@@ -57,5 +59,7 @@ namespace RP2040{
     IOQSPI m_io_qspi;
     PadsQSPI m_pads_qspi;
     XOSC m_xosc;
+    Timer m_timer;
+    PLL m_pll_sys, m_pll_usb;
   };
 }
