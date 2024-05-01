@@ -196,7 +196,7 @@
       set_reg(Rd, result);\
       SETFLAGS_NZCV(result, carry, overflow);\
       do_trace({\
-        std::cout << FMT_reg(Rd) << ":=0x" << FMT_hex(Rm_val)  \
+        std::cout << FMT_reg(Rd) << ":=0x" << FMT_hex(result)  \
                   << ";FLAGS=" << FMT_flags(m_APSR)\
                   << std::endl;\
       })\
@@ -288,7 +288,7 @@
     uint32_t Rn = (opcode >> 24) & 0x07;\
     do_disasm({\
       std::cout << FMT_op16(opcode) \
-                << FMT_dis_imm8Rdn("CMP", Rn, imm8)\
+                << FMT_dis_imm8Rdn("CMP", imm8, Rn)\
                 << std::endl;\
     })\
     do_exec({\
@@ -299,7 +299,10 @@
       auto overflow = std::get<2>(_res);\
       SETFLAGS_NZCV(result, carry, overflow);\
       do_trace({\
-        std::cout << "FLAGS=" << FMT_flags(m_APSR) \
+        std::cout << "result=0x" << FMT_hex(result) \
+                  << ";Rn_val=0x" << FMT_hex(Rn_val) \
+                  << ";simm32=0x" << FMT_hex(simm32) \
+                  << ";FLAGS=" << FMT_flags(m_APSR) \
                   << std::endl;\
       })\
     })\
@@ -512,7 +515,7 @@
       do_exec({\
         uint32_t Rm_val = get_reg(Rm);\
         uint32_t Rn_val = get_reg(Rn);\
-        auto _res = AddWithCarry(Rn_val, ~Rm_val, true);\
+        auto _res = AddWithCarry(Rn_val, ~Rm_val, 1);\
         auto result = std::get<0>(_res);\
         auto carry = std::get<1>(_res);\
         auto overflow = std::get<2>(_res);\
@@ -808,6 +811,7 @@
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
       uint32_t data = co_await m_mpu_bus_interface.read_byte(addr); \
       data = SignExtend(data, 8);\
+      set_reg(Rt, data);\
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemS[" << std::hex << addr << ",1]=0x" << std::hex << (data) \
                   << std::endl;\
@@ -872,7 +876,7 @@
     })\
   }
 
-#define OPCODE_0101_011_ldrsh(opcode, do_disasm, do_exec, do_trace, core) \
+#define OPCODE_0101_111_ldrsh(opcode, do_disasm, do_exec, do_trace, core) \
   { \
     uint32_t Rm = (instr >> 22) & 0x7; \
     uint32_t Rn = (instr >> 19) & 0x7; \
@@ -1122,8 +1126,8 @@
 
 #define OPCODE_1011_001_ext(opcode, do_disasm, do_exec, do_trace, core) \
   { \
-    uint32_t Rd = (opcode >> 16) & 0xf;\
-    uint32_t Rm = (opcode >> 19) & 0xf;\
+    uint32_t Rd = (opcode >> 16) & 0x7;\
+    uint32_t Rm = (opcode >> 19) & 0x7;\
     switch(opcode & 0x00c0'0000){\
       case 0x0000'0000: {\
         do_disasm({\
@@ -1457,7 +1461,7 @@
   { \
     uint32_t imm11 = (opcode >> 15) & 0xffe; \
     if (imm11 >= 2048) imm11 -= 4096; \
-    uint32_t offset = imm11 + 4; \
+    int32_t offset = imm11 + 4; \
     do_disasm({\
       std::cout << FMT_op16(opcode) << "B ~#" << FMT_dec(offset) << std::endl;\
     })\
@@ -1611,7 +1615,7 @@
   /*0101_100*/ o(0b0101'100, OPCODE_0101_100_ldr) \
   /*0101_101*/ o(0b0101'101, OPCODE_0101_101_ldrh) \
   /*0101_110*/ o(0b0101'110, OPCODE_0101_110_ldrb) \
-  /*0101_111*/ o(0b0101'111, OPCODE_UNDEFINED) \
+  /*0101_111*/ o(0b0101'111, OPCODE_0101_111_ldrsh) \
   /*0110_000*/ o(0b0110'000, OPCODE_0110_0xx_store) \
   /*0110_001*/ o(0b0110'001, OPCODE_0110_0xx_store) \
   /*0110_010*/ o(0b0110'010, OPCODE_0110_0xx_store) \

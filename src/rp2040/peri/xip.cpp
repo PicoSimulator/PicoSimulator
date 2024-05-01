@@ -19,7 +19,7 @@ Awaitable<uint8_t> XIP::read_byte(uint32_t addr)
     case 0x0100'0000:
     case 0x0200'0000:
     case 0x0300'0000:
-      co_return ((uint8_t*)m_flash.begin())[(addr&0x00ff'ffff)/2];
+      co_return ((uint8_t*)m_flash.begin())[(addr&0x00ff'ffff)];
   }
 }
 

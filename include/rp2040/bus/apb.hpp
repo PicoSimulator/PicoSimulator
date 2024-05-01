@@ -38,6 +38,8 @@ namespace RP2040{
     virtual Awaitable<void> write_byte(uint32_t addr, uint8_t in) override;
     virtual Awaitable<void> write_halfword(uint32_t addr, uint16_t in) override;
     virtual Awaitable<void> write_word(uint32_t addr, uint32_t in) override;
+
+    Timer &timer() { return m_timer; }
   protected:
   private:
     // UART0
