@@ -32,6 +32,7 @@ namespace RP2040{
     RP2040();
     virtual void reset() override;
     void run();
+    void load_binary(const std::string &path);
   protected:
   private:
     class IOPort final: public IReadWritePort<uint32_t>{
@@ -95,21 +96,27 @@ namespace RP2040{
         DEVICE_MAX,
       };
       std::tuple<BusDevice, uint32_t> lookupBusDeviceAddress(uint32_t addr) const;
-      struct BusOp{
+      struct BusOp {
         BusOp(BusDevice dev, AHB &ahb) : m_dev{dev}, m_ahb{ahb}{}
+        ~BusOp(){
+          // std::cout << "BusOp destroyed" << std::endl;
+          std::get<1>(m_ahb.m_busOps[m_dev]) = false;
+        }
         bool await_ready() { return false; }
         void await_suspend(std::coroutine_handle<> h) {
           std::get<0>(m_ahb.m_busOps[m_dev]).push(h);
           // std::cout << "waiting on AHB" << std::endl;
         }
-        void await_resume() {}
+        void await_resume() {
+          // std::cout << "resuming?" << std::endl;
+        }
         BusDevice m_dev;
         AHB &m_ahb;
       };
       BusOp registerBusOp(BusDevice dev) {
         return BusOp{dev, *this};
       }
-      std::array<std::tuple<std::queue<std::coroutine_handle<>>>, int(BusDevice::DEVICE_MAX)> m_busOps;
+      std::array<std::tuple<std::queue<std::coroutine_handle<>>, bool>, int(BusDevice::DEVICE_MAX)> m_busOps;
       RP2040 &m_rp2040;
 
       // ROM (0x0000'0000, 0x0000'4000)
@@ -126,8 +133,6 @@ namespace RP2040{
       //   SRAM3 (0x2100'3000, 0x0001'0000)
       // APB Peripherals (0x4000'0000, 0x1000'0000)
       // AHB-Lite Peripherals (0x5000'0000, 0x1000'0000)
-      // IOPORT Registers (0xD000'0000, 0x1000'0000)
-      // System Registers (0xE000'0000, 0x2000'0000)
 
       // only the AHB has to implement bus priority, and even then it's only low or high priority for each master.
       // the only other place priority is important is the SIO where proc0 always has priority over proc1.
@@ -175,19 +180,5 @@ namespace RP2040{
     APB m_apb;
     CoreBus m_core_bus[2];
     ARMv6M::ARMv6MCore m_cores[2];
-  };
-
-  class RP2040XIP final: public IMemoryDevice{
-  public:
-    RP2040XIP(RP2040 &rp2040);
-    virtual PortState read_byte(uint32_t addr, uint8_t &out) override;
-    virtual PortState read_halfword(uint32_t addr, uint16_t &out) override;
-    virtual PortState read_word(uint32_t addr, uint32_t &out) override;
-    virtual PortState write_byte(uint32_t addr, uint8_t in) override;
-    virtual PortState write_halfword(uint32_t addr, uint16_t in) override;
-    virtual PortState write_word(uint32_t addr, uint32_t in) override;
-  protected:
-  private:
-    RP2040 &m_rp2040;
   };
 }

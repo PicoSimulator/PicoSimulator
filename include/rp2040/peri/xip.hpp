@@ -10,23 +10,14 @@
 #include "fifo.hpp"
 #include "rp2040/peri/ssi.hpp"
 #include <fstream>
+#include <span>
 
 namespace RP2040{
   class XIP final : public IAsyncReadWritePort<uint32_t>, public IClockable{
   public:
-    XIP(SSI &ssi) : m_ssi{ssi} {
-      std::ifstream file("/home/skyler/git/raspberrypi/pico-examples/build/hello_world/serial/hello_serial.bin", std::ios::binary | std::ios::ate);
-      std::streamsize size = file.tellg();
-      file.seekg(0, std::ios::beg);
-
-      if (file.read((char*)m_flash.begin(), size))
-      {
-          /* worked! */
-      } else {
-          /* failed! */
-          std::terminate();
-      }
-
+    XIP(SSI &ssi) : m_ssi{ssi} {}
+    void load_binary_data(const std::span<uint8_t> data){
+      std::copy(data.begin(), data.end(), m_flash.begin());
     }
     virtual void tick() override;
     virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
@@ -47,6 +38,9 @@ namespace RP2040{
     std::array<tag_set, 1024> m_cache_tags;
     saturating_counter<uint32_t> m_hit_counter;
     saturating_counter<uint32_t> m_acc_counter;
+
+    bool cache_set_lookup(uint32_t addr, uint32_t &set, uint32_t &line_no);
+    void cache_set_choose_replacement(uint32_t set, uint32_t &line_no);
 
     uint32_t m_stream_ctr;
     uint32_t m_stream_addr;

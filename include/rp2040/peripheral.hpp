@@ -27,7 +27,7 @@ public:
   }
   virtual PortState write_word(uint32_t addr, uint32_t in) override final
   {
-    std::cout << "IPeripheralPort::write_word(0x" << std::hex << addr << ", 0x" << in << ")" << std::dec << std::endl;
+    // std::cout << "IPeripheralPort::write_word(0x" << std::hex << addr << ", 0x" << in << ")" << std::dec << std::endl;
     switch(addr&0x0000'3000) {
       case 0x0000'0000:
         return write_word_internal(addr, in);

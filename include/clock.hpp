@@ -13,12 +13,13 @@ private:
 
 class Clock {
 public:
-  void sink_add(IClockable *c);
-  void sink_remove(IClockable *c);
+  void sink_add(IClockable &c);
+  void sink_remove(IClockable &c);
 protected:
   void do_tick();
 private:
-  std::vector<IClockable*> m_clock_sinks;
+  std::vector<std::reference_wrapper<IClockable>> m_clock_sinks;
+  bool m_enabled;
 };
 
 class ClockTransform : public Clock, public IClockable{};

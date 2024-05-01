@@ -2,26 +2,12 @@
 
 #include "ext/io/spidev.hpp"
 #include <array>
-#include <fstream>
+#include <span>
 
 class W25QFlash final : public SPIDev
 {
 public:
   W25QFlash() : SPIDev{} {
-    // for (size_t i = 0; i < m_flash.size(); i++)
-      // m_flash[i] = i & 0xff;
-
-    std::ifstream file("/home/skyler/git/raspberrypi/pico-examples/build/hello_world/serial/hello_serial.bin", std::ios::binary | std::ios::ate);
-    std::streamsize size = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    if (file.read((char*)m_flash.begin(), size))
-    {
-        /* worked! */
-    } else {
-        /* failed! */
-        std::terminate();
-    }
 
     spi_start(nullptr, 1);
   }
@@ -60,6 +46,11 @@ public:
         m_addr += 32;
       }
     }
+  }
+
+  void load_binary_data(const std::span<uint8_t> data)
+  {
+    std::copy(data.begin(), data.end(), m_flash.begin());
   }
 private:
   enum State{

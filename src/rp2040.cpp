@@ -5,6 +5,8 @@
 #include "armv6m/exception.hpp"
 #include <iostream>
 #include <iomanip>
+#include <fstream>
+#include <vector>
 
 using namespace RP2040;
 
@@ -19,8 +21,14 @@ RP2040::RP2040::RP2040()
 , m_core_bus{{m_ioports[0], m_ahb}, {m_ioports[1], m_ahb}}
 , m_cores{{m_core_bus[0], "core-0"}, {m_core_bus[1], "core-1"}}
 {
-  // m_
-  // m_apb.timer().
+  clk_sys.sink_add(m_cores[0]);
+  // clk_sys.sink_add(m_cores[1]);
+  clk_sys.sink_add(m_ahb);
+  // clk_sys.sink_add(m_dma);
+  clk_sys.sink_add(m_XIP);
+  clk_sys.sink_add(m_SSI);
+  clk_ref.sink_add(m_apb.timer());
+  clk_peri.sink_add(m_apb.uart0());
 }
 
 void RP2040::RP2040::reset()
@@ -35,17 +43,31 @@ void RP2040::RP2040::run()
   int ticks = 0;
   while (ticks++ < 100000) {
     std::cout << "\nTICK " << ticks << std::endl;
-    m_cores[0].tick();
-    // m_cores[1].tick();
-    // m_dma.tick();
-    m_ahb.tick();
-    // AHBLite.tick();
-    // -APB.tick()
-    // peripherals.tick()
-    m_XIP.tick();
-    m_SSI.tick();
-    m_apb.timer().tick();
+    clk_sys.tick();
+    clk_ref.tick();
+    clk_peri.tick();
   }
+}
+
+void RP2040::RP2040::load_binary(const std::string &path)
+{
+  std::cout << "RP2040::load_binary(" << path << ")" << std::endl;
+  std::ifstream file(path, std::ios::binary | std::ios::ate);
+  std::streamsize size = file.tellg();
+  file.seekg(0, std::ios::beg);
+  std::vector<uint8_t> buf;
+  buf.resize(size);
+
+  if (file.read((char*)buf.data(), size))
+  {
+      /* worked! */
+  } else {
+      /* failed! */
+      std::terminate();
+  }
+
+  m_XIP.load_binary_data(buf);
+  m_SSI.spidev().load_binary_data(buf);
 }
 
 std::tuple<RP2040::RP2040::AHB::BusDevice, uint32_t> RP2040::RP2040::AHB::lookupBusDeviceAddress(uint32_t addr) const
@@ -100,7 +122,8 @@ Awaitable<uint8_t> RP2040::RP2040::AHB::read_byte(uint32_t addr)
   auto val = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(val);
   auto offset = std::get<1>(val);
-  co_await registerBusOp(dev);
+  auto op = registerBusOp(dev);
+  co_await op;
   uint8_t out;
   switch(dev) {
     case BusDevice::ROM: out = /* [8192] */byte_array_read_as_byte(m_rp2040.m_ROM, offset); break;
@@ -122,7 +145,8 @@ Awaitable<uint16_t> RP2040::RP2040::AHB::read_halfword(uint32_t addr)
   auto val = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(val);
   auto offset = std::get<1>(val);
-  co_await registerBusOp(dev);
+  auto op = registerBusOp(dev);
+  co_await op;  
   uint16_t out;
   switch(dev) {
     case BusDevice::ROM: out = /* [8192] */ byte_array_read_as_halfword(m_rp2040.m_ROM, offset); break;
@@ -144,7 +168,8 @@ Awaitable<uint32_t> RP2040::RP2040::AHB::read_word(uint32_t addr)
   auto val = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(val);
   auto offset = std::get<1>(val);
-  co_await registerBusOp(dev);
+  auto op = registerBusOp(dev);
+  co_await op;
   uint32_t out;
   switch(dev) {
     case BusDevice::ROM: out = /* [8192] */ byte_array_read_as_word(m_rp2040.m_ROM, offset); break;
@@ -167,7 +192,8 @@ Awaitable<void> RP2040::RP2040::AHB::write_byte(uint32_t addr, uint8_t val)
   auto devoffset = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(devoffset);
   auto offset = std::get<1>(devoffset);
-  co_await registerBusOp(dev);
+  auto op = registerBusOp(dev);
+  co_await op;  uint16_t out;
   switch(dev) {
     case BusDevice::ROM: /* [8192] */  break;
     case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_byte(m_rp2040.m_SRAM0, offset, val); break;
@@ -185,7 +211,8 @@ Awaitable<void> RP2040::RP2040::AHB::write_halfword(uint32_t addr, uint16_t val)
   auto devoffset = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(devoffset);
   auto offset = std::get<1>(devoffset);
-  co_await registerBusOp(dev);
+  auto op = registerBusOp(dev);
+  co_await op;  uint16_t out;
   switch(dev) {
     case BusDevice::ROM: /* [8192] */  break;
     case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_halfword(m_rp2040.m_SRAM0, offset, val); break;
@@ -203,7 +230,8 @@ Awaitable<void> RP2040::RP2040::AHB::write_word(uint32_t addr, uint32_t val)
   auto devoffset = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(devoffset);
   auto offset = std::get<1>(devoffset);
-  co_await registerBusOp(dev);
+  auto op = registerBusOp(dev);
+  co_await op;  uint16_t out;
   std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
   switch(dev) {
     case BusDevice::ROM: /* [8192] */  break;
@@ -278,10 +306,11 @@ Awaitable<void> RP2040::RP2040::CoreBus::write_word(uint32_t addr, uint32_t val)
 void RP2040::RP2040::AHB::tick()
 {
   for(int i = 0; i < BusDevice::DEVICE_MAX; i++) {
-    auto& [q] = m_busOps[i];
-    if (q.empty())
+    auto& [q, busy] = m_busOps[i];
+    if (q.empty() || busy)
       continue;
     auto h = q.front();
+    busy = true;
     h.resume();
     q.pop();
   }
@@ -308,6 +337,10 @@ PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){
     case 0xd000'0050: out = m_tx_fifo.status_send() | m_rx_fifo.status_recv(); break;
     // case 0xd000'0054: out = ; break;
     case 0xd000'0058: out = m_rx_fifo.recv(); break;
+    case 0xd000'0060: out = m_divider.get_dividend(); break;
+    case 0xd000'0064: out = m_divider.get_divisor(); break;
+    case 0xd000'0068: out = m_divider.get_dividend(); break;
+    case 0xd000'006c: out = m_divider.get_divisor(); break;
     case 0xd000'0070: out = m_divider.get_quotient(); break;
     case 0xd000'0074: out = m_divider.get_remainder(); break;
     case 0xd000'0078: out = m_divider.get_status(); break;
@@ -333,6 +366,8 @@ PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){
     case 0xd000'0064: m_divider.set_udivisor(in); break;
     case 0xd000'0068: m_divider.set_sdividend(in); break;
     case 0xd000'006c: m_divider.set_sdivisor(in); break;
+    case 0xd000'0070: m_divider.set_quotient(in); break;
+    case 0xd000'0074: m_divider.set_remainder(in); break;
     ENUM_SPINLOCKS(SPINLOCKS_EVAL)
 
     default: throw ARMv6M::BusFault{addr};

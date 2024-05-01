@@ -26,6 +26,7 @@ namespace RP2040{
     {}
     virtual ~SSI() {};
     virtual void tick() override;
+    W25QFlash &spidev() { return *m_spidev; }
   protected:
     virtual PortState read_word_internal(uint32_t addr, uint32_t &out) final override;
     virtual PortState write_word_internal(uint32_t addr, uint32_t in) final override;
@@ -52,7 +53,7 @@ namespace RP2040{
     uint32_t m_spi_ctrlr0;
 
 
-    SPIDev *m_spidev;
+    W25QFlash *m_spidev;
 
     enum RegOffset{
       CTRLR0 = 0x00,

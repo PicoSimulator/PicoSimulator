@@ -41,6 +41,14 @@ namespace RP2040::Core
       m_divisor = divisor;
       start_udiv();
     }
+    uint32_t get_dividend()
+    {
+      return m_dividend;
+    }
+    uint32_t get_divisor()
+    {
+      return m_divisor;
+    }
     uint32_t get_quotient()
     {
       m_status &= ~2;
@@ -52,6 +60,18 @@ namespace RP2040::Core
       // return 0x55aaaa55;
       return m_remainder;
     }
+    void set_quotient(uint32_t quotient)
+    {
+      m_quotient = quotient;
+      m_completion_cycles = 0;
+      m_status |= 3;
+    }
+    void set_remainder(uint32_t remainder)
+    {
+      m_remainder = remainder;
+      m_completion_cycles = 0;
+      m_status |= 3;
+    }
     uint32_t get_status() 
     {
       return m_status;
@@ -62,21 +82,15 @@ namespace RP2040::Core
     void start_sdiv()
     {
       if (m_divisor == 0) return;
-      int64_t dividend = (int32_t)m_dividend;
-      int64_t divisor = (int32_t)m_divisor;
-      dividend = dividend << 32;
-      m_quotient = (dividend / m_divisor) >> 32;
-      m_remainder = m_dividend % m_divisor;
+      m_quotient = int32_t(m_dividend) / int32_t(m_divisor);
+      m_remainder = int32_t(m_dividend) % int32_t(m_divisor);
       m_completion_cycles = 8;
       m_status &= ~1;
     }
     void start_udiv()
     {
       if (m_divisor == 0) return;
-      uint64_t dividend = m_dividend;
-      uint64_t divisor = m_divisor;
-      dividend = dividend << 32;
-      m_quotient = (dividend / divisor) >> 32;
+      m_quotient = m_dividend / m_divisor;
       m_remainder = m_dividend % m_divisor;
       m_completion_cycles = 8;
       m_status &= ~1;

@@ -125,3 +125,34 @@ Awaitable<void> XIP::write_word(uint32_t addr, uint32_t in)
   }
   throw ARMv6M::UnimplementedFault{"XIP::write_word"};
 }
+
+bool XIP::cache_set_lookup(uint32_t addr, uint32_t &set, uint32_t &line_no) {
+  uint32_t offset = addr & 0x07; // 3 bit byte address
+  set = (addr >> 3) & 0x3ff; // 10 bit set address
+  uint32_t tag = (addr >> 13) & 0x7ff; // 11 bit tag
+  auto &tag_set = m_cache_tags[set];
+  for (int i = 0; i < 2; i++) {
+    auto &[valid, line_tag] = tag_set[i];
+    if (valid && line_tag == tag) {
+      // hit
+      line_no = i;
+      return true;
+    }
+  }
+  return false;
+}
+
+void XIP::cache_set_choose_replacement(uint32_t set, uint32_t &line_no) {
+  // replacement policy to choose which line to replace
+  // choose first invalid line
+  auto &tag_set = m_cache_tags[set];
+  for (int i = 0; i < 2; i++) {
+    auto &[valid, line_tag] = tag_set[i];
+    if (!valid) {
+      line_no = i;
+      return;
+    }
+  }
+  // choose random line
+  line_no = rand() & 1;
+}
