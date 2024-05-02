@@ -15,7 +15,13 @@
 namespace RP2040{
   class XIP final : public IAsyncReadWritePort<uint32_t>, public IClockable{
   public:
-    XIP(SSI &ssi) : m_ssi{ssi} {}
+    XIP(SSI &ssi) : m_ssi{ssi} {
+      for (auto &tag_set : m_cache_tags) {
+        for (auto &tag : tag_set) {
+          tag = {false, 0};
+        }
+      }
+    }
     void load_binary_data(const std::span<uint8_t> data){
       std::copy(data.begin(), data.end(), m_flash.begin());
     }
@@ -41,6 +47,7 @@ namespace RP2040{
 
     bool cache_set_lookup(uint32_t addr, uint32_t &set, uint32_t &line_no);
     void cache_set_choose_replacement(uint32_t set, uint32_t &line_no);
+    void flush();
 
     uint32_t m_stream_ctr;
     uint32_t m_stream_addr;

@@ -36,8 +36,21 @@ Awaitable<uint16_t> XIP::read_halfword(uint32_t addr)
 
 Awaitable<uint32_t> XIP::read_word(uint32_t addr) 
 {
+  uint32_t set, line_no;
+  uint32_t line_offset;
   switch(addr&0x0f00'0000) {
     case 0x0000'0000:
+      if (cache_set_lookup(addr, set, line_no)) {
+        m_hit_counter++;
+        line_offset = set * 16 + line_no*8;
+      } else {
+        cache_set_choose_replacement(set, line_no);
+        line_offset = set * 16 + line_no*8;
+        std::copy(&m_flash[(addr&0x00ff'fff8)] , &m_flash[(addr&0x00ff'fff8) + 8], &m_data[line_offset]);
+        m_cache_tags[set][line_no] = {true, (addr >> 13) & 0x7ff};
+      }
+      m_acc_counter++;
+      co_return ((uint32_t*)m_data.data())[(line_offset + (addr&0x0000'0007))/4];
     case 0x0100'0000:
     case 0x0200'0000:
     case 0x0300'0000:
@@ -50,10 +63,12 @@ Awaitable<uint32_t> XIP::read_word(uint32_t addr)
         case 0x0004: // FLUSH
           co_return 0x0000'0000;
         case 0x0008: // STAT
-          co_return 0x0000'0002;
+          co_return 0x0000'0003;
         case 0x000c:
+          // co_return 0;
           co_return m_hit_counter.get();
         case 0x0010:
+          // co_return 0;
           co_return m_acc_counter.get();
         case 0x0014: // STREAM_ADDR
           co_return m_stream_addr;
@@ -87,8 +102,13 @@ Awaitable<void> XIP::write_halfword(uint32_t addr, uint16_t in)
 
 Awaitable<void> XIP::write_word(uint32_t addr, uint32_t in) 
 {
+  uint32_t set, line_no;
   switch(addr&0x0f00'0000) {
     case 0x0000'0000:
+      if (cache_set_lookup(addr, set, line_no)) {
+        auto &[valid, line_tag] = m_cache_tags[set][line_no];
+        valid = 0;
+      }
     case 0x0100'0000:
     case 0x0200'0000:
     case 0x0300'0000: co_return; // do nothing
@@ -98,6 +118,7 @@ Awaitable<void> XIP::write_word(uint32_t addr, uint32_t in)
         case 0x0000: // CTRL
           // co_return 0x0000'000b;
         case 0x0004: // FLUSH
+          flush();
           // co_return 0x0000'0000;
         case 0x0008: // STAT
           // co_return 0x0000'0002;
@@ -133,8 +154,10 @@ bool XIP::cache_set_lookup(uint32_t addr, uint32_t &set, uint32_t &line_no) {
   auto &tag_set = m_cache_tags[set];
   for (int i = 0; i < 2; i++) {
     auto &[valid, line_tag] = tag_set[i];
-    if (valid && line_tag == tag) {
+    std::cout << "tag: " << line_tag << " valid: " << valid << std::endl;
+    if (valid && (line_tag == tag)) {
       // hit
+      std::cout << "hit2\n";
       line_no = i;
       return true;
     }
@@ -155,4 +178,12 @@ void XIP::cache_set_choose_replacement(uint32_t set, uint32_t &line_no) {
   }
   // choose random line
   line_no = rand() & 1;
+}
+
+void XIP::flush() {
+  for (auto &tag_set : m_cache_tags) {
+    for (auto &tag : tag_set) {
+      tag = {false, 0};
+    }
+  }
 }

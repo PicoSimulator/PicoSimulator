@@ -1,5 +1,7 @@
 #pragma once
 
+#include <limits>
+
 template<class T>
 class saturating_counter {
 public:
@@ -10,6 +12,6 @@ public:
   T operator++(int) { increment(); return m_counter; }
 protected:
 private:
-  void increment() { if (m_counter < (T{-1})) m_counter++; }
+  void increment() { if (m_counter < std::numeric_limits<T>::max()) m_counter++; }
   T m_counter;
 };

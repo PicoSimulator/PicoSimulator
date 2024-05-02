@@ -5,6 +5,14 @@ project(PicoSim)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_compile_options(-ggdb -g -O3)
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+# using Clang
+  add_compile_options(-gdwarf-4)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  # using GCC
+  add_compile_options(-flto -fcoroutines)
+  add_link_options(-flto -O3)
+endif()
 
 set(TARGET picosim)
 add_library(${TARGET} STATIC)

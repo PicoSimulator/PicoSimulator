@@ -90,6 +90,7 @@ public:
       default:
         throw ARMv6M::BusFault{addr};
     }
+    co_return;
   }
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) = 0;

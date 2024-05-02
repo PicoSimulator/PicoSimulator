@@ -4,16 +4,27 @@
 #include "clock.hpp"
 #include "fifo.hpp"
 
+#include <fstream>
+#include <memory>
+#include <bitset>
+
 class UART final : public IPeripheralPort, public IClockable{
 public:
   void tick() override final
   {
+    if ((m_control & Control::UART_EN) == 0) return;
     //fractional divider
     if (!m_idiv || (--m_idiv == 0 && m_fdiv > m_fbrd)) {
       m_idiv = m_ibrd;
       m_fbrd = (m_fdiv - m_fbrd) & 0x3f; // modulo 64
       subtick();
     }
+  }
+  void open(const std::string & path) {
+    m_file.rdbuf()->pubsetbuf(0, 0);
+    m_file.open(path, std::ios::binary | std::ios::out | std::ios::in);
+    if (m_file.badbit)
+      std::cout << "Failed to open file" << std::endl;
   }
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
@@ -28,6 +39,7 @@ protected:
           m_status &= ~(1 << 4);
         }
         break;
+      case UARTCR: out = m_control; break;
       case UARTIBRD: out = m_ibrd; break;
       case UARTFBRD: out = m_fbrd; break;
       case UARTPERIPHID0: out = 0x11; break;
@@ -43,9 +55,6 @@ protected:
   }
   virtual PortState write_word_internal(uint32_t addr, uint32_t in) override final
   {
-    if ((addr & 0xff) == 0x00) {
-      std::cout << "UART DR: " << std::hex << in << "  (" << char(in) << ")" << std::endl;
-    }
     switch(addr & 0xff) {
       case UARTDR:
         if (!m_tx_fifo.full()) {
@@ -56,11 +65,7 @@ protected:
       case UARTFBRD: m_fbrd = in & 0x3f; break;
       case UARTLCR_H: break;
       case UARTCR:
-        if (in & 1) {
-          m_status |= 1;
-        } else {
-          m_status &= ~1;
-        }
+        m_control = in;
         break;
       case UARTICR:
         m_status &= ~in;
@@ -101,8 +106,52 @@ private:
     UARTPCELLID3 = 0xffc
 
   };
+
+  enum Control{
+    UART_EN = 1<<0,
+    SIR_EN = 1<<1,
+    SIR_LP = 1<<2,
+    LOOPBACK_EN = 1<<7,
+    TX_EN = 1<<8,
+    RX_EN = 1<<9,
+    DTR = 1<<10,
+    RTS = 1<<11,
+    OUT1 = 1<<12,
+    OUT2 = 1<<13,
+    RTS_EN = 1<<14,
+    CTS_EN = 1<<15,
+  };
+
   void subtick() {
     std::cout << "UART_SUBTICK" << std::endl;
+    std::cout << std::bitset<32>{m_control} << std::endl;
+    if (m_control & Control::TX_EN && m_shift_out_counter == 0 && !m_tx_fifo.empty()) {
+      m_shift_out_counter = wordlength();
+      char c = m_tx_fifo.pop();
+      if (m_file.is_open()) {
+        m_file.write(&c, 1);
+      }
+    } else if (m_shift_out_counter > 0) {
+      m_shift_out_counter--;
+    }
+    if (m_control & Control::RX_EN && m_shift_in_counter == 0) {
+      m_shift_in_counter = wordlength();
+      char c;
+      if (m_file.is_open()) {
+        if (m_file.readsome(&c, 1) == 1) {
+          // check for overflow
+          m_rx_fifo.push(c);
+          m_shift_in_counter = wordlength();
+        }
+      }
+    } else if (m_shift_in_counter > 0) {
+      m_shift_in_counter--;
+    }
+  }
+
+  uint32_t wordlength() const
+  {
+    return (m_lcr_h >> 5) & 3;
   }
 
   FiFo<uint32_t, 32> m_tx_fifo;
@@ -113,7 +162,15 @@ private:
   uint32_t m_fbrd;
   uint32_t m_control;
 
+  uint32_t m_lcr_h;
+  uint32_t m_lcr_l;
+
   uint32_t m_idiv;
   uint32_t m_fdiv;
+
+  std::fstream m_file;
+
+  uint32_t m_shift_in_counter;
+  uint32_t m_shift_out_counter;
 
 };

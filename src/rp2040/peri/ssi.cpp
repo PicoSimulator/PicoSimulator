@@ -4,20 +4,8 @@ using namespace RP2040;
 
 void SSI::tick()
 {
-  // if(m_rp2040.m_clocks.ssi_enabled()) {
-  //   if(m_rp2040.m_clocks.ssi_tx_fifo_enabled()) {
-  //     if(m_rp2040.m_clocks.ssi_tx_fifo_level() > 0) {
-  //       m_rp2040.m_io_qspi.write_word(0, m_tx_fifo.pop());
-  //     }
-  //   }
-  //   if(m_rp2040.m_clocks.ssi_rx_fifo_enabled()) {
-  //     if(m_rp2040.m_clocks.ssi_rx_fifo_level() < 16) {
-  //       m_rx_fifo.push(m_rp2040.m_io_qspi.read_word(0));
-  //     }
-  //   }
-  // }
-  if ((m_ctrlr0 & 0x000f'f000) == 0x0007'0000 && m_tx_fifo.count() > 0 && !m_rx_fifo.full() && m_spidev) {
-    m_rx_fifo.push(m_spidev->spi_exchange_byte(m_tx_fifo.pop()));
+  if ((m_ctrlr0 & 0x000f'f000) == 0x0007'0000 && m_tx_fifo.count() > 0 && !m_rx_fifo.full()) {
+    m_rx_fifo.push(spidev().spi_exchange_byte(m_tx_fifo.pop()));
   }
 }
 

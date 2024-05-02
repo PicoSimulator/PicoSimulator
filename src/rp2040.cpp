@@ -8,8 +8,6 @@
 #include <fstream>
 #include <vector>
 
-using namespace RP2040;
-
 RP2040::RP2040::RP2040()
 : m_XIP{m_SSI}
 , m_SSI{*this}
@@ -22,7 +20,7 @@ RP2040::RP2040::RP2040()
 , m_cores{{m_core_bus[0], "core-0"}, {m_core_bus[1], "core-1"}}
 {
   clk_sys.sink_add(m_cores[0]);
-  // clk_sys.sink_add(m_cores[1]);
+  clk_sys.sink_add(m_cores[1]);
   clk_sys.sink_add(m_ahb);
   // clk_sys.sink_add(m_dma);
   clk_sys.sink_add(m_XIP);
@@ -41,8 +39,8 @@ void RP2040::RP2040::reset()
 void RP2040::RP2040::run()
 {
   int ticks = 0;
-  while (ticks++ < 100000) {
-    std::cout << "\nTICK " << ticks << std::endl;
+  while (ticks++ < 1000000) {
+    // std::cout << "\nTICK " << ticks << std::endl;
     clk_sys.tick();
     clk_ref.tick();
     clk_peri.tick();
@@ -68,6 +66,11 @@ void RP2040::RP2040::load_binary(const std::string &path)
 
   m_XIP.load_binary_data(buf);
   m_SSI.spidev().load_binary_data(buf);
+}
+
+UART &RP2040::RP2040::UART0()
+{
+  return m_apb.uart0();
 }
 
 std::tuple<RP2040::RP2040::AHB::BusDevice, uint32_t> RP2040::RP2040::AHB::lookupBusDeviceAddress(uint32_t addr) const
@@ -137,7 +140,7 @@ Awaitable<uint8_t> RP2040::RP2040::AHB::read_byte(uint32_t addr)
     case BusDevice::XIP: out = co_await m_rp2040.m_XIP.read_byte(addr); break;
     default: throw ARMv6M::BusFault{addr};
   }
-  std::cout << "read_byte(" << std::hex << addr << std::dec << ") completed " << uint{out} << std::endl;
+  // std::cout << "read_byte(" << std::hex << addr << std::dec << ") completed " << uint{out} << std::endl;
   co_return out;
 }
 Awaitable<uint16_t> RP2040::RP2040::AHB::read_halfword(uint32_t addr)
@@ -183,7 +186,7 @@ Awaitable<uint32_t> RP2040::RP2040::AHB::read_word(uint32_t addr)
     case BusDevice::XIP: out = co_await m_rp2040.m_XIP.read_word(addr); break;
     default: throw ARMv6M::BusFault{};
   }
-  std::cout << "read_word(" << std::hex << addr << std::dec << ") completed " << out << std::endl;
+  // std::cout << "read_word(" << std::hex << addr << std::dec << ") completed " << out << std::endl;
   co_return out;
 }
 
@@ -232,7 +235,7 @@ Awaitable<void> RP2040::RP2040::AHB::write_word(uint32_t addr, uint32_t val)
   auto offset = std::get<1>(devoffset);
   auto op = registerBusOp(dev);
   co_await op;  uint16_t out;
-  std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
+  // std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
   switch(dev) {
     case BusDevice::ROM: /* [8192] */  break;
     case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_word(m_rp2040.m_SRAM0, offset, val); break;

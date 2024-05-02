@@ -95,11 +95,11 @@ BusMaster ARMv6MCore::core_task()
           }
         }
         m_nextPC = PC() + instr_incr;
-        std::cout << "fetch complete " << m_name << " instr: "
-          << std::hex << std::setw(8) << std::setfill('0') << instr << std::dec
-          << " addr: "
-          << std::hex << std::setw(8) << std::setfill('0') << PC() << std::dec
-          << std::endl;
+        // std::cout << "fetch complete " << m_name << " instr: "
+        //   << std::hex << std::setw(8) << std::setfill('0') << instr << std::dec
+        //   << " addr: "
+        //   << std::hex << std::setw(8) << std::setfill('0') << PC() << std::dec
+        //   << std::endl;
 
         co_await exec_instr(instr);
         PC() = m_nextPC;
@@ -238,7 +238,7 @@ Awaitable<void> ARMv6MCore::exec_instr(uint32_t instr)
 
   #define OPCODE(prefix, fun) \
     case prefix: \
-      fun(instr, DO_DISAS, DO, DO_TRACE, this); \
+      fun(instr, DONT, DO, DONT, this); \
       break;
 
   #define REP0 OPCODE

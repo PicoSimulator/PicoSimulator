@@ -22,11 +22,10 @@ namespace RP2040{
   public:
     SSI(RP2040 &rp2040) 
     : m_rp2040{rp2040}
-    , m_spidev{new W25QFlash()} 
     {}
     virtual ~SSI() {};
     virtual void tick() override;
-    W25QFlash &spidev() { return *m_spidev; }
+    W25QFlash &spidev() { return m_spidev; }
   protected:
     virtual PortState read_word_internal(uint32_t addr, uint32_t &out) final override;
     virtual PortState write_word_internal(uint32_t addr, uint32_t in) final override;
@@ -53,7 +52,7 @@ namespace RP2040{
     uint32_t m_spi_ctrlr0;
 
 
-    W25QFlash *m_spidev;
+    W25QFlash m_spidev;
 
     enum RegOffset{
       CTRLR0 = 0x00,
@@ -86,16 +85,5 @@ namespace RP2040{
       TXD_DRIVE_EDGE = 0xf8,
     };
   };
-
-  class SSIFiFoAux : public IPeripheralPort{
-  public:
-  protected:
-    virtual PortState read_word_internal(uint32_t addr, uint32_t &out) final override;
-    virtual PortState write_word_internal(uint32_t addr, uint32_t in) final override;
-    virtual uint32_t read_word_internal_pure(uint32_t addr) const final override;
-  private:
-    SSI &m_ssi;
-  };
-
 
 }

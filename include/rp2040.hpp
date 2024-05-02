@@ -33,6 +33,8 @@ namespace RP2040{
     virtual void reset() override;
     void run();
     void load_binary(const std::string &path);
+    UART &UART0();
+
   protected:
   private:
     class IOPort final: public IReadWritePort<uint32_t>{
@@ -48,6 +50,7 @@ namespace RP2040{
       virtual PortState write_byte(uint32_t addr, uint8_t in) override;
       virtual PortState write_halfword(uint32_t addr, uint16_t in) override;
       virtual PortState write_word(uint32_t addr, uint32_t in) override;
+
     protected:
     private:
     uint32_t m_cpuid;
@@ -157,6 +160,7 @@ namespace RP2040{
     // these are coroutine tasks
     // they may be blocked on a memory access.
     // once all tasks are suspended memory access can be performed.
+
 
     // GPIO Pads
     Pad m_pads_bank0[30];

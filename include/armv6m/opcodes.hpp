@@ -108,8 +108,9 @@
     })\
     do_exec({\
       uint32_t Rm_val = core->get_reg(Rm);\
-      bool carry_out = Rm_val & (1 << imm5);\
+      bool carry_out = false; \
       if (imm5 != 0) {\
+        carry_out = Rm_val & (1 << (imm5-1));\
         Rm_val >>= imm5;\
       }\
       core->set_reg(Rd, Rm_val);\
@@ -421,13 +422,45 @@
       do_exec({\
         uint32_t Rdn_val = get_reg(Rdn);\
         uint32_t Rm_val = get_reg(Rm);\
-        bool carry = Rdn_val&(1<<(Rm));\
+        bool carry = Rdn_val&(1<<(Rm_val-1));\
         Rdn_val >>= Rm_val; \
         set_reg(Rdn, Rdn_val); \
         SETFLAGS_NZC(Rdn_val, carry);\
         do_trace({\
           std::cout << FMT_reg(Rdn) << ":=0x" << FMT_hex(Rdn_val)  \
                     << ";FLAGS=" << FMT_flags(m_APSR) \
+                    << std::endl;\
+        })\
+      })\
+    } break; \
+    case 0b0100:{\
+      uint32_t Rdn = (opcode >> 16) & 0x07;\
+      uint32_t Rm = (opcode >> 19) & 0x07;\
+      do_disasm({std::cout << FMT_op16(opcode) << FMT_dis_RdnRm("ASR", Rdn, Rm) << std::endl; })\
+      do_exec({\
+        uint32_t Rdn_val = get_reg(Rdn);\
+        uint32_t Rm_val = get_reg(Rm);\
+        bool carry = Rdn_val&(1<<(Rm_val-1));\
+        Rdn_val >>= Rm_val; \
+        set_reg(Rdn, Rdn_val); \
+        SETFLAGS_NZC(Rdn_val, carry);\
+        do_trace({\
+          std::cout << FMT_reg(Rdn) << ":=0x" << FMT_hex(Rdn_val)  \
+                    << ";FLAGS=" << FMT_flags(m_APSR) \
+                    << std::endl;\
+        })\
+      })\
+      do_exec({\
+        uint32_t Rdn_val = get_reg(Rdn);\
+        uint32_t Rm_val = get_reg(Rm);\
+        bool carry = Rdn_val&(1<<(Rm_val-1));\
+        Rm_val >>= Rm_val;\
+        Rm_val = SignExtend(Rm_val, 32 - Rm_val); \
+        core->set_reg(Rdn, Rdn_val);\
+        SETFLAGS_NZC(Rdn_val, carry);\
+        do_trace({\
+          std::cout << FMT_reg(Rdn) << ":=0x" << FMT_hex(Rdn_val)  \
+                    << ";FLAGS=" << FMT_flags(m_APSR)\
                     << std::endl;\
         })\
       })\
