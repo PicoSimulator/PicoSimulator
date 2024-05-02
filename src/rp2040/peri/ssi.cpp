@@ -5,10 +5,21 @@ using namespace RP2040;
 void SSI::tick()
 {
   if ((m_ctrlr0 & 0x000f'f000) == 0x0007'0000 && m_tx_fifo.count() > 0 && !m_rx_fifo.full()) {
+    if (m_ctrlr0 & 0x0080'0000) {
+      spidev().set_cs(0);
+    }
+    switch(m_ctrlr0 & 0x0030'0000) {
+      case 0x0000'0000: /*Standard SPI, 1-bit per SCK, full-duplex*/
+      case 0x0010'0000: /*Dual SPI, 2-bit per SCK, half-duplex*/
+      case 0x0020'0000: /*QUAD SPI, 4-bit per SCK, half-duplex*/
+    }
     m_rx_fifo.push(spidev().spi_exchange_byte(m_tx_fifo.pop()));
+    if (m_ctrlr0 & 0x0080'0000) {
+      spidev().set_cs(1);
+    }
   }
 }
-
+ 
 PortState SSI::read_word_internal(uint32_t addr, uint32_t &out)
 {
   switch(addr & 0xfc) {

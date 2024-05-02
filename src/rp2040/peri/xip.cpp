@@ -40,6 +40,9 @@ Awaitable<uint32_t> XIP::read_word(uint32_t addr)
   uint32_t line_offset;
   switch(addr&0x0f00'0000) {
     case 0x0000'0000:
+      // normal cache operation
+      // check for hit, update cache on miss
+      m_acc_counter++;
       if (cache_set_lookup(addr, set, line_no)) {
         m_hit_counter++;
         line_offset = set * 16 + line_no*8;
@@ -49,11 +52,28 @@ Awaitable<uint32_t> XIP::read_word(uint32_t addr)
         std::copy(&m_flash[(addr&0x00ff'fff8)] , &m_flash[(addr&0x00ff'fff8) + 8], &m_data[line_offset]);
         m_cache_tags[set][line_no] = {true, (addr >> 13) & 0x7ff};
       }
-      m_acc_counter++;
       co_return ((uint32_t*)m_data.data())[(line_offset + (addr&0x0000'0007))/4];
     case 0x0100'0000:
+      // check for hit, don't update cache on miss
+      m_acc_counter++;
+      if (cache_set_lookup(addr, set, line_no)) {
+        m_hit_counter++;
+        line_offset = set * 16 + line_no*8;
+        co_return ((uint32_t*)m_data.data())[(line_offset + (addr&0x0000'0007))/4];
+      } else {
+        // don't update cache on miss
+        co_return ((uint32_t*)m_flash.begin())[(addr&0x00ff'ffff)/4];
+      }
     case 0x0200'0000:
+      // don't check for hit, always update cache
+      m_acc_counter++;
+      set = cache_set_decode(addr);
+      cache_set_choose_replacement(set, line_no);
+      line_offset = set * 16 + line_no*8;
+      std::copy(&m_flash[(addr&0x00ff'fff8)] , &m_flash[(addr&0x00ff'fff8) + 8], &m_data[line_offset]);
+      m_cache_tags[set][line_no] = {true, (addr >> 13) & 0x7ff};
     case 0x0300'0000:
+      // completely bypass cache
       co_return ((uint32_t*)m_flash.begin())[(addr&0x00ff'ffff)/4];
     case 0x0400'0000:
     {
@@ -147,17 +167,23 @@ Awaitable<void> XIP::write_word(uint32_t addr, uint32_t in)
   throw ARMv6M::UnimplementedFault{"XIP::write_word"};
 }
 
+uint32_t XIP::cache_tag_decode(uint32_t addr) {
+  return (addr >> 13) & 0x7ff;
+}
+
+uint32_t XIP::cache_set_decode(uint32_t addr) {
+  return (addr >> 3) & 0x3ff;
+}
+
 bool XIP::cache_set_lookup(uint32_t addr, uint32_t &set, uint32_t &line_no) {
   uint32_t offset = addr & 0x07; // 3 bit byte address
-  set = (addr >> 3) & 0x3ff; // 10 bit set address
-  uint32_t tag = (addr >> 13) & 0x7ff; // 11 bit tag
+  set = cache_set_decode(addr); // 10 bit set address
+  uint32_t tag = cache_tag_decode(addr); // 11 bit tag
   auto &tag_set = m_cache_tags[set];
   for (int i = 0; i < 2; i++) {
     auto &[valid, line_tag] = tag_set[i];
-    std::cout << "tag: " << line_tag << " valid: " << valid << std::endl;
     if (valid && (line_tag == tag)) {
       // hit
-      std::cout << "hit2\n";
       line_no = i;
       return true;
     }

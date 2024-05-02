@@ -45,6 +45,8 @@ namespace RP2040{
     saturating_counter<uint32_t> m_hit_counter;
     saturating_counter<uint32_t> m_acc_counter;
 
+    static uint32_t cache_tag_decode(uint32_t addr);
+    static uint32_t cache_set_decode(uint32_t addr);
     bool cache_set_lookup(uint32_t addr, uint32_t &set, uint32_t &line_no);
     void cache_set_choose_replacement(uint32_t set, uint32_t &line_no);
     void flush();

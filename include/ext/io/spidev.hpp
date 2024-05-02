@@ -27,6 +27,17 @@ public:
     return out;
   }
 
+  void qspi_write(uint8_t *data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+      spi_exchange_byte(data[i]);
+    }
+  }
+  void qspi_recieve(uint8_t *data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+      data[i] = spi_exchange_byte(0);
+    }
+  }
+
   void set_cs(bool cs) 
   {
     if (m_cs != cs) {
@@ -51,6 +62,15 @@ protected:
     m_send_buffer_len = 0;
     m_send_buffer_index = 0;
   }
+  void qspi_start(uint8_t *data, size_t len)
+  {
+    spi_start(data, len);
+  }
+  void qspi_stop()
+  {
+    spi_stop();
+  }
+  
   bool spi_cs() const { return m_cs; }
 private:
   uint8_t m_send_buffer[SEND_BUFFER_MAX];
