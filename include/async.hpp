@@ -15,20 +15,23 @@ class Generator;
 template<class T>
 class Awaitable;
 
-// class Task {
-// public:
+class Task {
+public:
+  std::coroutine_handle<> get_handle() const { return m_handle; }
 // protected:
 // private:
-//     struct Promise;
-//     using Handle = std::coroutine_handle<Promise>;
-//     struct Promise {
-//         Task get_return_object() const { return {Handle::from_promise(*this)}; }
-//         std::suspend_never initial_suspend() noexcept { return {}; }
-//         std::suspend_never final_suspend() noexcept { return {}; }
-//         void return_void() {}
-//         void unhandled_exception() { std::terminate(); }
-//     };
-// };
+    struct promise_type;
+    using Handle = std::coroutine_handle<promise_type>;
+    Task (Handle handle) : m_handle(handle) {}
+    struct promise_type {
+        Task get_return_object() { return Task{Handle::from_promise(*this)}; }
+        std::suspend_never initial_suspend() noexcept { return {}; }
+        std::suspend_never final_suspend() noexcept { return {}; }
+        void return_void() {}
+        void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
+    };
+    Handle m_handle;
+};
 
 // template<class T>
 // class Generator {
