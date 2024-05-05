@@ -62,8 +62,10 @@ BusMaster ARMv6MCore::core_task()
     m_EPSR = 0;
     m_PRIMASK = 0;
     m_CONTROL = 0;
+    std::cout << "getting SP" << std::endl;
     m_MSP = co_await m_mpu_bus_interface.read_word(vectortable + 0x00); // SP
     SP() = m_MSP;
+    std::cout << "getting PC" << std::endl;
     uint32_t start = co_await m_mpu_bus_interface.read_word(vectortable + 0x04); // RESET
     PC() = start;
 
@@ -101,7 +103,41 @@ BusMaster ARMv6MCore::core_task()
         //   << std::hex << std::setw(8) << std::setfill('0') << PC() << std::dec
         //   << std::endl;
 
-        co_await exec_instr(instr);
+        // co_await exec_instr(instr);
+        
+        #define DO(x) {x}
+        #define DO_DISAS(x) {std::cout << "D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
+        #define DO_TRACE(x) {std::cout << "T:";  {x}}
+        #define DO2(x, y) {x}{y}
+        #define DONT(x) 
+
+        #define OPCODE(prefix, fun) \
+          case prefix: \
+            fun(instr, DONT, DO, DONT, this); \
+            break;
+
+        #define REP0 OPCODE
+
+        #define REP1(prefix, fun) \
+          REP0(prefix##0, fun) \
+          REP0(prefix##1, fun) \
+
+        #define REP2(prefix, fun) \
+          REP1(prefix##0, fun) \
+          REP1(prefix##1, fun) \
+
+        #define REP3(prefix, fun) \
+          REP2(prefix##0, fun) \
+          REP2(prefix##1, fun) \
+
+        switch(instr >> 25) {
+          ENUM_OPCODES(REP0)
+        }
+        #undef OPCODE
+        #undef REP1
+        #undef REP2
+        #undef REP3
+        #undef REP4
         PC() = m_nextPC;
         //check for PC special values?
 

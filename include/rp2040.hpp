@@ -15,6 +15,7 @@ namespace RP2040 {
 #include "bus.hpp"
 #include "rp2040/pad.hpp"
 #include "rp2040/bus/apb.hpp"
+#include "rp2040/bus/ahb.hpp"
 #include "rp2040/core/fifo.hpp"
 #include "rp2040/core/divider.hpp"
 #include "rp2040/core/spinlock.hpp"
@@ -34,6 +35,16 @@ namespace RP2040{
     void run();
     void load_binary(const std::string &path);
     UART &UART0();
+    Bus::APB &APB() { return m_apb; }
+    ::RP2040::XIP &XIP() { return m_XIP; }
+
+    auto &ROM() { return m_ROM; }
+    auto &SRAM0() { return m_SRAM0; }
+    auto &SRAM1() { return m_SRAM1; }
+    auto &SRAM2() { return m_SRAM2; }
+    auto &SRAM3() { return m_SRAM3; }
+    auto &SRAM4() { return m_SRAM4; }
+    auto &SRAM5() { return m_SRAM5; }
 
   protected:
   private:
@@ -72,88 +83,54 @@ namespace RP2040{
     std::array<uint8_t, 4096> m_SRAM4;
     std::array<uint8_t, 4096> m_SRAM5;
 
-    class AHB final: public IAsyncReadWritePort<uint32_t>, public IClockable{
-    public:
-      AHB(RP2040 &rp2040) : m_rp2040{rp2040}{}
-      virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
-      virtual Awaitable<uint16_t> read_halfword(uint32_t addr) override;
-      virtual Awaitable<uint32_t> read_word(uint32_t addr) override;
-      virtual Awaitable<void> write_byte(uint32_t addr, uint8_t in) override;
-      virtual Awaitable<void> write_halfword(uint32_t addr, uint16_t in) override;
-      virtual Awaitable<void> write_word(uint32_t addr, uint32_t in) override;
-      virtual void tick() override;
-    protected:
-    private:
-      enum BusDevice {
-        ROM,
-        XIP,
-        // SSI, is on APB
-        SRAM0,
-        SRAM1,
-        SRAM2,
-        SRAM3,
-        SRAM4,
-        SRAM5,
-        APB,
-        AHBLITE,
-        DEVICE_MAX,
-      };
-      std::tuple<BusDevice, uint32_t> lookupBusDeviceAddress(uint32_t addr) const;
-      struct BusOp {
-        BusOp(BusDevice dev, AHB &ahb) : m_dev{dev}, m_ahb{ahb}{}
-        ~BusOp(){
-          // std::cout << "BusOp destroyed" << std::endl;
-          std::get<1>(m_ahb.m_busOps[m_dev]) = false;
-        }
-        bool await_ready() { return false; }
-        void await_suspend(std::coroutine_handle<> h) {
-          std::get<0>(m_ahb.m_busOps[m_dev]).push(h);
-          // std::cout << "waiting on AHB" << std::endl;
-        }
-        void await_resume() {
-          // std::cout << "resuming?" << std::endl;
-        }
-        BusDevice m_dev;
-        AHB &m_ahb;
-      };
-      BusOp registerBusOp(BusDevice dev) {
-        return BusOp{dev, *this};
-      }
-      std::array<std::tuple<std::queue<std::coroutine_handle<>>, bool>, int(BusDevice::DEVICE_MAX)> m_busOps;
-      RP2040 &m_rp2040;
-
-      // ROM (0x0000'0000, 0x0000'4000)
-      // XIP (0x1000'0000, 0x1000'0000)
-      //   XIP (0x1000'0000, 0x0800'0000)
-      //   SSI (0x1800'0000, 0x0800'0000)
-      // SRAM (0x2000'0000, 0x1000'0000)
-      //   SRAM_STRIPED (0x2000'0000, 0x0004'0000)
-      //   SRAM4 (0x2004'0000, 0x0000'1000)
-      //   SRAM5 (0x2004'1000, 0x0000'1000)
-      //   SRAM0 (0x2100'0000, 0x0001'0000)
-      //   SRAM1 (0x2100'1000, 0x0001'0000)
-      //   SRAM2 (0x2100'2000, 0x0001'0000)
-      //   SRAM3 (0x2100'3000, 0x0001'0000)
-      // APB Peripherals (0x4000'0000, 0x1000'0000)
-      // AHB-Lite Peripherals (0x5000'0000, 0x1000'0000)
-
-      // only the AHB has to implement bus priority, and even then it's only low or high priority for each master.
-      // the only other place priority is important is the SIO where proc0 always has priority over proc1.
-    };
 
     class CoreBus final : public IAsyncReadWritePort<uint32_t>{
     public:
-      CoreBus(IOPort &ioport, AHB &ahb) : m_ioport{ioport}, m_ahb{ahb} {}
-      virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
-      virtual Awaitable<uint16_t> read_halfword(uint32_t addr) override;
-      virtual Awaitable<uint32_t> read_word(uint32_t addr) override;
-      virtual Awaitable<void> write_byte(uint32_t addr, uint8_t in) override;
-      virtual Awaitable<void> write_halfword(uint32_t addr, uint16_t in) override;
-      virtual Awaitable<void> write_word(uint32_t addr, uint32_t in) override;
+      CoreBus(IOPort &ioport, Bus::AHB &ahb) 
+      : m_ioport{ioport}
+      , m_ahb{ahb} 
+      , m_op{nullptr}
+      , m_runner{bus_task().get_handle()}
+      {}
+      Awaitable<uint8_t> read_byte_internal(uint32_t addr);
+      Awaitable<uint16_t> read_halfword_internal(uint32_t addr);
+      Awaitable<uint32_t> read_word_internal(uint32_t addr);
+      Awaitable<void> write_byte_internal(uint32_t addr, uint8_t in);
+      Awaitable<void> write_halfword_internal(uint32_t addr, uint16_t in);
+      Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
     protected:
+      virtual void register_op(MemoryOperation &op) override final{
+        // std::cout << "CoreBus Registering op" << std::hex << (uintptr_t)this << ":" << uintptr_t(&op) << std::endl;
+        assert(m_op == nullptr);
+        m_op = &op;
+        if(m_waiting_on_op)
+          m_runner.resume();
+      }
+      virtual void deregister_op(MemoryOperation &op) override final{
+        // std::cout << "CoreBus deRegistering op" << std::hex << (uintptr_t)this << ":" << uintptr_t(&op) << std::endl;
+        assert(m_op == &op);
+        m_op = nullptr;
+        m_waiting_on_op = false;
+      }
+    private:
+      MemoryOperation *m_op;
+      std::coroutine_handle<> m_runner;
+      bool m_waiting_on_op;
+      auto next_op(){
+        struct awaitable{
+          bool await_ready() { return m_bus.m_op != nullptr; }
+          MemoryOperation &await_resume() { return *m_bus.m_op; }
+          void await_suspend(std::coroutine_handle<> handle) {
+            m_bus.m_waiting_on_op = true;
+          }
+          CoreBus &m_bus;
+        };
+        return awaitable{*this};
+      }
+      Task bus_task();
     private:
       IOPort &m_ioport;
-      AHB &m_ahb;
+      Bus::AHB &m_ahb;
     };
 
     // keep a list of the Bus Masters
@@ -173,15 +150,15 @@ namespace RP2040{
     SysCfg m_syscfg;
 
     // AHB Peripherals
-    XIP m_XIP;
+    ::RP2040::XIP m_XIP;
     SSI m_SSI;
 
     // IOPORT Peripherals
     Core::FiFo m_fifo_01, m_fifo_10;
     IOPort m_ioports[2];
     BusMaster *m_bus_masters[2];
-    AHB m_ahb;
-    APB m_apb;
+    Bus::AHB m_ahb;
+    Bus::APB m_apb;
     CoreBus m_core_bus[2];
     ARMv6M::ARMv6MCore m_cores[2];
   };

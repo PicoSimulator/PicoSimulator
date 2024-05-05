@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <cassert>
+#include <coroutine>
 #include "async.hpp"
 
 enum class PortState{
@@ -31,41 +33,134 @@ private:
 template<class Addr>
 class IReadWritePort : public IReadPort<Addr>, public IWritePort<Addr>{};
 
-// template<class T>
-// class BusAwaitable
-// {
-// public:
-// protected:
-// private:
-//   struct promise_type;
-//   using Handle = std::coroutine<promise_type>;
-//   struct promise_type{
 
+template<class Addr, class Device>
+using AddressDecoder = std::tuple<Device, Addr>(*)(Addr addr);
+
+template<class Addr, class Device, AddressDecoder<Addr, Device> decoder, class ...Devices>
+class IBusSplitter{};
+
+// template<class Addr, class Data = uint32_t>
+// struct MemoryOp{
+//   enum OpType{
+//     READ_BYTE,
+//     READ_HALFWORD,
+//     READ_WORD,
+//     WRITE_BYTE,
+//     WRITE_HALFWORD,
+//     WRITE_WORD,
 //   };
+//   Addr addr;
+//   Data data;
+//   bool read_not_write;
+//   uint32_t size;
+//   std::coroutine_handle<> m_caller;
+//   IAsyncReadPort<Addr> &m_port;
+//   bool await_ready() { return false; }
+//   void await_suspend(std::coroutine_handle<> handle) {}
+//   Data await_resume() { return data; }
 // };
 
 template<class Addr>
-class IAsyncReadPort{
-public:
-  virtual Awaitable<uint8_t> read_byte(Addr addr) = 0;
-  virtual Awaitable<uint16_t> read_halfword(Addr addr) = 0;
-  virtual Awaitable<uint32_t> read_word(Addr addr) = 0;
-protected:
-private:
+class IAsyncReadWritePort;
+
+struct MemoryOperation{
+  struct [[nodiscard]] awaiter {
+    std::coroutine_handle<> caller;
+    bool await_ready() { return false; }
+    void await_suspend(std::coroutine_handle<> handle) {
+      // std::cout << "resuming handle " << uintptr_t(this) << std::endl;
+      // allow the caller to continue until next suspend point.
+      handle.resume();
+      // std::cout << "resuming caller " << uintptr_t(this) << std::endl;
+      caller.resume();
+    }
+    void await_resume() {}
+  };
+  uint32_t addr;
+  uint32_t data;
+  enum OpType{
+    READ_BYTE,
+    READ_HALFWORD,
+    READ_WORD,
+    WRITE_BYTE,
+    WRITE_HALFWORD,
+    WRITE_WORD,
+  } optype;
+  bool is_read() const {
+    return optype == READ_BYTE || optype == READ_HALFWORD || optype == READ_WORD;
+  }
+  bool is_write() const {
+    return optype == WRITE_BYTE || optype == WRITE_HALFWORD || optype == WRITE_WORD;
+  }
+  IAsyncReadWritePort<uint32_t> &m_port;
+  std::coroutine_handle<> m_caller = nullptr;
+  awaiter return_void() ;
+  awaiter return_value(uint32_t value);
+  bool await_ready() { 
+    return false;
+  }
+  void await_suspend(std::coroutine_handle<> handle);
+  uint32_t await_resume() {
+    return data;
+  }
+
+
 };
 
-template<class Addr>
-class IAsyncWritePort{
-public:
-  virtual Awaitable<void> write_byte(Addr addr, uint8_t in) = 0;
-  virtual Awaitable<void> write_halfword(Addr addr, uint16_t in) = 0;
-  virtual Awaitable<void> write_word(Addr addr, uint32_t in) = 0;
-protected:
-private:
-};
+// template<class Addr>
+// class IAsyncReadPort{
+// public:
+//   virtual Awaitable<uint8_t> read_byte(Addr addr) = 0;
+//   virtual Awaitable<uint16_t> read_halfword(Addr addr) = 0;
+//   virtual Awaitable<uint32_t> read_word(Addr addr) = 0;
+// protected:
+// private:
+// };
+
+// template<class Addr>
+// class IAsyncWritePort{
+// public:
+//   virtual Awaitable<void> write_byte(Addr addr, uint8_t in) = 0;
+//   virtual Awaitable<void> write_halfword(Addr addr, uint16_t in) = 0;
+//   virtual Awaitable<void> write_word(Addr addr, uint32_t in) = 0;
+// protected:
+// private:
+// };
 
 template<class Addr>
-class IAsyncReadWritePort : public IAsyncReadPort<Addr>, public IAsyncWritePort<Addr>{};
+class IAsyncReadWritePort{
+public:
+  MemoryOperation read_byte(Addr addr) {
+    // std::cout << "read_byte" << std::endl;
+    return MemoryOperation{addr, 0, MemoryOperation::READ_BYTE, *this};
+  }
+  MemoryOperation read_halfword(Addr addr) {
+    // std::cout << "read_halfword" << std::endl;
+    return MemoryOperation{addr, 0, MemoryOperation::READ_HALFWORD, *this};
+  }
+  MemoryOperation read_word(Addr addr) {
+    // std::cout << "read_word " << std::hex << addr << std::endl;
+    return MemoryOperation{addr, 0, MemoryOperation::READ_WORD, *this};
+  }
+  MemoryOperation write_byte(Addr addr, uint8_t in) {
+    // std::cout << "write_byte" << std::endl;
+    return MemoryOperation{addr, in, MemoryOperation::WRITE_BYTE, *this};
+  }
+  MemoryOperation write_halfword(Addr addr, uint16_t in) {
+    // std::cout << "write_halfword" << std::endl;
+    return MemoryOperation{addr, in, MemoryOperation::WRITE_HALFWORD, *this};
+  }
+  MemoryOperation write_word(Addr addr, uint32_t in) {
+    // std::cout << "write_word " << std::hex << addr << ":" << in <<  std::endl;
+    return MemoryOperation{addr, in, MemoryOperation::WRITE_WORD, *this};
+  }
+  virtual void register_op(MemoryOperation &op) = 0;
+  virtual void deregister_op(MemoryOperation &op) = 0;
+protected:
+private:
+
+};
 
 // template<class Addr>
 // class AsyncWriteAdapter : public IWritePort<Addr>, public IAsyncReadWritePort<Addr>{

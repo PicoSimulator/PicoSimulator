@@ -73,185 +73,47 @@ UART &RP2040::RP2040::UART0()
   return m_apb.uart0();
 }
 
-std::tuple<RP2040::RP2040::AHB::BusDevice, uint32_t> RP2040::RP2040::AHB::lookupBusDeviceAddress(uint32_t addr) const
+Task RP2040::RP2040::CoreBus::bus_task()
 {
-  // std::cout << "lookupBusDeviceAddress(" << std::hex << std::setprecision(8) << addr << std::dec << ")" << std::endl;
-  switch(addr & 0xf000'0000) {
-    case 0x0000'0000: 
-      if (addr < 0x0004'0000) 
-        return {BusDevice::ROM, addr&0x0000'ffff}; 
-      break;
-    case 0x1000'0000:
-      return {BusDevice::XIP, addr&0x00ff'ffff};
-    case 0x2000'0000:
-    {
-      constexpr const auto srams = 
-        std::array<BusDevice, 6>{
-          BusDevice::SRAM0,
-          BusDevice::SRAM1,
-          BusDevice::SRAM2,
-          BusDevice::SRAM3, 
-          BusDevice::SRAM4, 
-          BusDevice::SRAM5, 
-          };
-      if (addr < 0x2004'0000) {
-        return {srams[(addr >> 2) & 0b11], ((addr>>2) & 0x0000'fffc) | (addr & 0x3)};
-      } else if (addr < 0x2004'2000) {
-        return {srams[4+(addr>>12) & 0b11], addr & 0x0000'0fff};
-      } else if (addr >= 0x2100'0000) {
-        return {srams[(addr>>16) & 0b11], addr & 0x0000'ffff};
-      }
-      break;
+  while(true) {
+    auto &op = co_await next_op();
+    switch(op.optype) {
+      case MemoryOperation::READ_BYTE:
+        co_await op.return_value(co_await read_byte_internal(op.addr));
+        break;
+      case MemoryOperation::READ_HALFWORD:{
+          uint32_t addr = op.addr;
+          if ((addr & 0xf000'0000) == 0xd000'0000) {
+            uint16_t val;
+            m_ioport.read_halfword(addr, val);
+            co_await op.return_value(val);
+          } else {
+            co_await op.return_value(co_await m_ahb.read_halfword(addr));
+          }
+        }
+        break;
+      case MemoryOperation::READ_WORD:
+        co_await op.return_value(co_await read_word_internal(op.addr));
+        break;
+      case MemoryOperation::WRITE_BYTE:
+        co_await write_byte_internal(op.addr, op.data);
+        co_await op.return_void();
+        break;
+      case MemoryOperation::WRITE_HALFWORD:
+        co_await write_halfword_internal(op.addr, op.data);
+        co_await op.return_void();
+        break;
+      case MemoryOperation::WRITE_WORD:
+        // std::cout << "CoreBus::bus_task WRITE_WORD " << std::hex << op.addr << ":" << op.data << std::dec << std::endl;
+        co_await write_word_internal(op.addr, op.data);
+        co_await op.return_void();
+        break;
     }
-    case 0x4000'0000:
-      return {BusDevice::APB, addr&0x00ff'ffff};
-    case 0x5000'0000:
-      return {BusDevice::AHBLITE, addr&0x00ff'ffff};
   }
-  throw ARMv6M::BusFault();
+
 }
 
-#define byte_array_read_as_byte(arr, index)     ({ uint32_t i = (index); (uint8_t{(arr)[(i)]}) ; })
-#define byte_array_read_as_halfword(arr, index) ({ uint32_t i = (index); (uint16_t{(arr)[(i)]} | (uint16_t{(arr)[(i)+1]} << 8)) ; })
-#define byte_array_read_as_word(arr, index)     ({ uint32_t i = (index); (uint32_t{(arr)[(i)]} | (uint32_t{(arr)[(i)+1]} << 8) | (uint32_t{(arr)[(i)+2]} << 16) | (uint32_t{(arr)[(i)+3]} << 24)) ; })
-
-#define byte_array_write_as_byte(arr, index, val)     ({ uint32_t i = (index); uint8_t v = (val); (arr)[(i)] = v; v; })
-#define byte_array_write_as_halfword(arr, index, val) ({ uint32_t i = (index); uint16_t v = (val); (arr)[(i)] = v & 0xff; (arr)[(i)+1] = (v >> 8) & 0xff; v; })
-#define byte_array_write_as_word(arr, index, val)     ({ uint32_t i = (index); uint32_t v = (val); (arr)[(i)] = v & 0xff; (arr)[(i)+1] = (v >> 8) & 0xff; (arr)[(i)+2] = (v >> 16) & 0xff; (arr)[(i)+3] = (v >> 24) & 0xff; v; })
-
-Awaitable<uint8_t> RP2040::RP2040::AHB::read_byte(uint32_t addr) 
-{
-  //queue read
-  auto val = lookupBusDeviceAddress(addr);
-  auto dev = std::get<0>(val);
-  auto offset = std::get<1>(val);
-  auto op = registerBusOp(dev);
-  co_await op;
-  uint8_t out;
-  switch(dev) {
-    case BusDevice::ROM: out = /* [8192] */byte_array_read_as_byte(m_rp2040.m_ROM, offset); break;
-    case BusDevice::SRAM0: out = /* [32768] */byte_array_read_as_byte(m_rp2040.m_SRAM0, offset); break;
-    case BusDevice::SRAM1: out = /* [32768] */byte_array_read_as_byte(m_rp2040.m_SRAM1, offset); break;
-    case BusDevice::SRAM2: out = /* [32768] */byte_array_read_as_byte(m_rp2040.m_SRAM2, offset); break;
-    case BusDevice::SRAM3: out = /* [32768] */byte_array_read_as_byte(m_rp2040.m_SRAM3, offset); break;
-    case BusDevice::SRAM4: out = /* [2048] */byte_array_read_as_byte(m_rp2040.m_SRAM4, offset); break;
-    case BusDevice::SRAM5: out = /* [2048] */byte_array_read_as_byte(m_rp2040.m_SRAM5, offset); break;
-    case BusDevice::APB: out = co_await m_rp2040.m_apb.read_byte(addr); break;
-    case BusDevice::XIP: out = co_await m_rp2040.m_XIP.read_byte(addr); break;
-    default: throw ARMv6M::BusFault{addr};
-  }
-  // std::cout << "read_byte(" << std::hex << addr << std::dec << ") completed " << uint{out} << std::endl;
-  co_return out;
-}
-Awaitable<uint16_t> RP2040::RP2040::AHB::read_halfword(uint32_t addr)
-{
-  auto val = lookupBusDeviceAddress(addr);
-  auto dev = std::get<0>(val);
-  auto offset = std::get<1>(val);
-  auto op = registerBusOp(dev);
-  co_await op;  
-  uint16_t out;
-  switch(dev) {
-    case BusDevice::ROM: out = /* [8192] */ byte_array_read_as_halfword(m_rp2040.m_ROM, offset); break;
-    case BusDevice::SRAM0: out = /* [32768] */ byte_array_read_as_halfword(m_rp2040.m_SRAM0, offset); break;
-    case BusDevice::SRAM1: out = /* [32768] */ byte_array_read_as_halfword(m_rp2040.m_SRAM1, offset); break;
-    case BusDevice::SRAM2: out = /* [32768] */ byte_array_read_as_halfword(m_rp2040.m_SRAM2, offset); break;
-    case BusDevice::SRAM3: out = /* [32768] */ byte_array_read_as_halfword(m_rp2040.m_SRAM3, offset); break;
-    case BusDevice::SRAM4: out = /* [2048] */ byte_array_read_as_halfword(m_rp2040.m_SRAM4, offset); break;
-    case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_halfword(m_rp2040.m_SRAM5, offset); break;
-    case BusDevice::APB: out = co_await m_rp2040.m_apb.read_halfword(addr); break;
-    case BusDevice::XIP: out = co_await m_rp2040.m_XIP.read_halfword(addr); break;
-    default: throw ARMv6M::BusFault{addr};
-  }
-  // std::cout << "read_halfword(" << std::hex << addr << std::dec << ") completed" << std::endl;
-  co_return out;
-}
-Awaitable<uint32_t> RP2040::RP2040::AHB::read_word(uint32_t addr)
-{
-  auto val = lookupBusDeviceAddress(addr);
-  auto dev = std::get<0>(val);
-  auto offset = std::get<1>(val);
-  auto op = registerBusOp(dev);
-  co_await op;
-  uint32_t out;
-  switch(dev) {
-    case BusDevice::ROM: out = /* [8192] */ byte_array_read_as_word(m_rp2040.m_ROM, offset); break;
-    case BusDevice::SRAM0: out = /* [32768] */ byte_array_read_as_word(m_rp2040.m_SRAM0, offset); break;
-    case BusDevice::SRAM1: out = /* [32768] */ byte_array_read_as_word(m_rp2040.m_SRAM1, offset); break;
-    case BusDevice::SRAM2: out = /* [32768] */ byte_array_read_as_word(m_rp2040.m_SRAM2, offset); break;
-    case BusDevice::SRAM3: out = /* [32768] */ byte_array_read_as_word(m_rp2040.m_SRAM3, offset); break;
-    case BusDevice::SRAM4: out = /* [2048] */ byte_array_read_as_word(m_rp2040.m_SRAM4, offset); break;
-    case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_word(m_rp2040.m_SRAM5, offset); break;
-    case BusDevice::APB: out = co_await m_rp2040.m_apb.read_word(addr); break;
-    case BusDevice::XIP: out = co_await m_rp2040.m_XIP.read_word(addr); break;
-    default: throw ARMv6M::BusFault{};
-  }
-  // std::cout << "read_word(" << std::hex << addr << std::dec << ") completed " << out << std::endl;
-  co_return out;
-}
-
-Awaitable<void> RP2040::RP2040::AHB::write_byte(uint32_t addr, uint8_t val)
-{
-  auto devoffset = lookupBusDeviceAddress(addr);
-  auto dev = std::get<0>(devoffset);
-  auto offset = std::get<1>(devoffset);
-  auto op = registerBusOp(dev);
-  co_await op;  uint16_t out;
-  switch(dev) {
-    case BusDevice::ROM: /* [8192] */  break;
-    case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_byte(m_rp2040.m_SRAM0, offset, val); break;
-    case BusDevice::SRAM1: /* [32768] */ byte_array_write_as_byte(m_rp2040.m_SRAM1, offset, val); break;
-    case BusDevice::SRAM2: /* [32768] */ byte_array_write_as_byte(m_rp2040.m_SRAM2, offset, val); break;
-    case BusDevice::SRAM3: /* [32768] */ byte_array_write_as_byte(m_rp2040.m_SRAM3, offset, val); break;
-    case BusDevice::SRAM4: /* [2048] */ byte_array_write_as_byte(m_rp2040.m_SRAM4, offset, val); break;
-    case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_byte(m_rp2040.m_SRAM5, offset, val); break;
-    case BusDevice::APB: co_await m_rp2040.m_apb.write_byte(addr, val); break;
-    default: throw ARMv6M::BusFault{addr};
-  }
-}
-Awaitable<void> RP2040::RP2040::AHB::write_halfword(uint32_t addr, uint16_t val)
-{
-  auto devoffset = lookupBusDeviceAddress(addr);
-  auto dev = std::get<0>(devoffset);
-  auto offset = std::get<1>(devoffset);
-  auto op = registerBusOp(dev);
-  co_await op;  uint16_t out;
-  switch(dev) {
-    case BusDevice::ROM: /* [8192] */  break;
-    case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_halfword(m_rp2040.m_SRAM0, offset, val); break;
-    case BusDevice::SRAM1: /* [32768] */ byte_array_write_as_halfword(m_rp2040.m_SRAM1, offset, val); break;
-    case BusDevice::SRAM2: /* [32768] */ byte_array_write_as_halfword(m_rp2040.m_SRAM2, offset, val); break;
-    case BusDevice::SRAM3: /* [32768] */ byte_array_write_as_halfword(m_rp2040.m_SRAM3, offset, val); break;
-    case BusDevice::SRAM4: /* [2048] */ byte_array_write_as_halfword(m_rp2040.m_SRAM4, offset, val); break;
-    case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_halfword(m_rp2040.m_SRAM5, offset, val); break;
-    case BusDevice::APB: co_await m_rp2040.m_apb.write_halfword(addr, val); break;
-    default: throw ARMv6M::BusFault{addr};
-  }
-}
-Awaitable<void> RP2040::RP2040::AHB::write_word(uint32_t addr, uint32_t val)
-{
-  auto devoffset = lookupBusDeviceAddress(addr);
-  auto dev = std::get<0>(devoffset);
-  auto offset = std::get<1>(devoffset);
-  auto op = registerBusOp(dev);
-  co_await op;  uint16_t out;
-  // std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
-  switch(dev) {
-    case BusDevice::ROM: /* [8192] */  break;
-    case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_word(m_rp2040.m_SRAM0, offset, val); break;
-    case BusDevice::SRAM1: /* [32768] */ byte_array_write_as_word(m_rp2040.m_SRAM1, offset, val); break;
-    case BusDevice::SRAM2: /* [32768] */ byte_array_write_as_word(m_rp2040.m_SRAM2, offset, val); break;
-    case BusDevice::SRAM3: /* [32768] */ byte_array_write_as_word(m_rp2040.m_SRAM3, offset, val); break;
-    case BusDevice::SRAM4: /* [2048] */ byte_array_write_as_word(m_rp2040.m_SRAM4, offset, val); break;
-    case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_word(m_rp2040.m_SRAM5, offset, val); break;
-    case BusDevice::APB: co_await m_rp2040.m_apb.write_word(addr, val); break;
-    case BusDevice::XIP: co_await m_rp2040.m_XIP.write_word(addr, val); break;
-    default: throw ARMv6M::BusFault{addr};
-  }
-  // std::cout << "write_word(" << std::hex << addr << std::dec << ") completed" << std::endl;
-}
-
-Awaitable<uint8_t> RP2040::RP2040::CoreBus::read_byte(uint32_t addr)
+Awaitable<uint8_t> RP2040::RP2040::CoreBus::read_byte_internal(uint32_t addr)
 {
   if ((addr & 0xf000'0000) == 0xd000'0000) {
     uint8_t val;
@@ -260,7 +122,7 @@ Awaitable<uint8_t> RP2040::RP2040::CoreBus::read_byte(uint32_t addr)
   }
   co_return co_await m_ahb.read_byte(addr);
 }
-Awaitable<uint16_t> RP2040::RP2040::CoreBus::read_halfword(uint32_t addr)
+Awaitable<uint16_t> RP2040::RP2040::CoreBus::read_halfword_internal(uint32_t addr)
 {
   if ((addr & 0xf000'0000) == 0xd000'0000) {
     uint16_t val;
@@ -269,7 +131,7 @@ Awaitable<uint16_t> RP2040::RP2040::CoreBus::read_halfword(uint32_t addr)
   }
   co_return co_await m_ahb.read_halfword(addr);
 }
-Awaitable<uint32_t> RP2040::RP2040::CoreBus::read_word(uint32_t addr)
+Awaitable<uint32_t> RP2040::RP2040::CoreBus::read_word_internal(uint32_t addr)
 {
   // std::cout << "CoreBus::read_word " << std::hex << addr << std::dec << std::endl;
   if ((addr & 0xf000'0000) == 0xd000'0000) {
@@ -280,7 +142,7 @@ Awaitable<uint32_t> RP2040::RP2040::CoreBus::read_word(uint32_t addr)
   co_return co_await m_ahb.read_word(addr);
 }
 
-Awaitable<void> RP2040::RP2040::CoreBus::write_byte(uint32_t addr, uint8_t val)
+Awaitable<void> RP2040::RP2040::CoreBus::write_byte_internal(uint32_t addr, uint8_t val)
 {
   if ((addr & 0xf000'0000) == 0xd000'0000) {
     m_ioport.write_byte(addr, val);
@@ -288,7 +150,7 @@ Awaitable<void> RP2040::RP2040::CoreBus::write_byte(uint32_t addr, uint8_t val)
     co_await m_ahb.write_byte(addr, val);
   }
 }
-Awaitable<void> RP2040::RP2040::CoreBus::write_halfword(uint32_t addr, uint16_t val)
+Awaitable<void> RP2040::RP2040::CoreBus::write_halfword_internal(uint32_t addr, uint16_t val)
 {
   if ((addr & 0xf000'0000) == 0xd000'0000) {
     m_ioport.write_halfword(addr, val);
@@ -296,7 +158,7 @@ Awaitable<void> RP2040::RP2040::CoreBus::write_halfword(uint32_t addr, uint16_t 
     co_await m_ahb.write_halfword(addr, val);
   }
 }
-Awaitable<void> RP2040::RP2040::CoreBus::write_word(uint32_t addr, uint32_t val)
+Awaitable<void> RP2040::RP2040::CoreBus::write_word_internal(uint32_t addr, uint32_t val)
 {
   // std::cout << "CoreBus::write_word " << std::hex << addr << std::dec << "\n";
   if ((addr & 0xf000'0000) == 0xd000'0000) {
@@ -306,18 +168,6 @@ Awaitable<void> RP2040::RP2040::CoreBus::write_word(uint32_t addr, uint32_t val)
   }
 }
 
-void RP2040::RP2040::AHB::tick()
-{
-  for(int i = 0; i < BusDevice::DEVICE_MAX; i++) {
-    auto& [q, busy] = m_busOps[i];
-    if (q.empty() || busy)
-      continue;
-    auto h = q.front();
-    busy = true;
-    h.resume();
-    q.pop();
-  }
-}
 
 PortState RP2040::RP2040::IOPort::read_byte(uint32_t addr, uint8_t &out){ 
   uint32_t out2;

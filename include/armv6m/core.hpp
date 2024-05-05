@@ -150,13 +150,40 @@ namespace ARMv6M{
     class MPU final : public IAsyncReadWritePort<uint32_t>{
     public:
       MPU(IAsyncReadWritePort<uint32_t> &bus, ARMv6MCore &core);
-      virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
-      virtual Awaitable<uint16_t> read_halfword(uint32_t addr) override;
-      virtual Awaitable<uint32_t> read_word(uint32_t addr) override;
-      virtual Awaitable<void> write_byte(uint32_t addr, uint8_t in) override;
-      virtual Awaitable<void> write_halfword(uint32_t addr, uint16_t in) override;
-      virtual Awaitable<void> write_word(uint32_t addr, uint32_t in) override;
+      Awaitable<uint8_t> read_byte_internal(uint32_t addr);
+      Awaitable<uint16_t> read_halfword_internal(uint32_t addr);
+      Awaitable<uint32_t> read_word_internal(uint32_t addr);
+      Awaitable<void> write_byte_internal(uint32_t addr, uint8_t in);
+      Awaitable<void> write_halfword_internal(uint32_t addr, uint16_t in);
+      Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
     protected:
+      virtual void register_op(MemoryOperation &op) override final{
+        assert(m_op == nullptr);
+        m_op = &op;
+        if(m_waiting_on_op)
+          m_runner.resume();
+      }
+      virtual void deregister_op(MemoryOperation &op) override final{
+        assert(m_op == &op);
+        m_op = nullptr;
+        m_waiting_on_op = false;
+      }
+    private:
+      MemoryOperation *m_op;
+      std::coroutine_handle<> m_runner;
+      bool m_waiting_on_op;
+      auto next_op(){
+        struct awaitable{
+          bool await_ready() { return m_bus.m_op != nullptr; }
+          MemoryOperation &await_resume() { return *m_bus.m_op; }
+          void await_suspend(std::coroutine_handle<> handle) {
+            m_bus.m_waiting_on_op = true;
+          }
+          MPU &m_bus;
+        };
+        return awaitable{*this};
+      }
+      Task bus_task();
     private:
       IAsyncReadWritePort<uint32_t> &m_bus_interface;
       ARMv6MCore &m_core;

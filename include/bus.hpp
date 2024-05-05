@@ -30,6 +30,12 @@ public:
   }
 };
 
+class BusSlave{};
+class BusSplitter : public BusSlave{};
+class BusArbiter : public BusMaster{};
+template<unsigned N>
+class BusCrossbar{};
+
 class Bus{
 public:
   void registerBusMaster(BusMaster *master){

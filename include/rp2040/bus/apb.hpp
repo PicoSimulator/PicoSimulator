@@ -15,8 +15,12 @@
 #include "rp2040/peri/timer.hpp"
 #include "rp2040/peri/pll.hpp"
 #include "rp2040/peri/uart.hpp"
+#include "async.hpp"
 
-namespace RP2040{
+#include <cassert>
+#include <coroutine>
+
+namespace RP2040::Bus{
 
   class APB final: public IAsyncReadWritePort<uint32_t>, public IClockable{
   public:
@@ -26,24 +30,51 @@ namespace RP2040{
       Clocks &clocks,
       SysCfg &syscfg
     ) 
-    : m_resets{resets}
+    : m_runner{bus_task().get_handle()}
+    , m_resets{resets}
     , m_vreg{vreg}
     , m_clocks{clocks}
     , m_syscfg{syscfg}
     {}
     virtual void tick() override;
-    virtual Awaitable<uint8_t> read_byte(uint32_t addr) override;
-    virtual Awaitable<uint16_t> read_halfword(uint32_t addr) override;
-    virtual Awaitable<uint32_t> read_word(uint32_t addr) override;
-    virtual Awaitable<void> write_byte(uint32_t addr, uint8_t in) override;
-    virtual Awaitable<void> write_halfword(uint32_t addr, uint16_t in) override;
-    virtual Awaitable<void> write_word(uint32_t addr, uint32_t in) override;
+    Awaitable<uint8_t> read_byte_internal(uint32_t addr);
+    Awaitable<uint16_t> read_halfword_internal(uint32_t addr);
+    Awaitable<uint32_t> read_word_internal(uint32_t addr);
+    Awaitable<void> write_byte_internal(uint32_t addr, uint8_t in);
+    Awaitable<void> write_halfword_internal(uint32_t addr, uint16_t in);
+    Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
 
     Timer &timer() { return m_timer; }
     UART &uart0() { return m_uart0; }
     UART &uart1() { return m_uart1; }
   protected:
+    virtual void register_op(MemoryOperation &op) override final{
+      assert(m_op == nullptr);
+      m_op = &op;
+      if(m_waiting_on_op)
+        m_runner.resume();
+    }
+    virtual void deregister_op(MemoryOperation &op) override final{
+      assert(m_op == &op);
+      m_op = nullptr;
+      m_waiting_on_op = false;
+    }
   private:
+    MemoryOperation *m_op;
+    std::coroutine_handle<> m_runner;
+    bool m_waiting_on_op;
+    auto next_op(){
+      struct awaitable{
+        bool await_ready() { return m_bus.m_op != nullptr; }
+        MemoryOperation &await_resume() { return *m_bus.m_op; }
+        void await_suspend(std::coroutine_handle<> handle) {
+          m_bus.m_waiting_on_op = true;
+        }
+        APB &m_bus;
+      };
+      return awaitable{*this};
+    }
+    Task bus_task();
     // UART0
     // UART1
     // SPI0

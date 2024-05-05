@@ -11,7 +11,7 @@ void SSI::tick()
     switch(m_ctrlr0 & 0x0030'0000) {
       case 0x0000'0000: /*Standard SPI, 1-bit per SCK, full-duplex*/
       case 0x0010'0000: /*Dual SPI, 2-bit per SCK, half-duplex*/
-      case 0x0020'0000: /*QUAD SPI, 4-bit per SCK, half-duplex*/
+      case 0x0020'0000: /*QUAD SPI, 4-bit per SCK, half-duplex*/;
     }
     m_rx_fifo.push(spidev().spi_exchange_byte(m_tx_fifo.pop()));
     if (m_ctrlr0 & 0x0080'0000) {
