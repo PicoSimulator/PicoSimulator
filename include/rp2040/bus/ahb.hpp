@@ -42,11 +42,20 @@ namespace RP2040::Bus{
            , m_id{id}
            {}
           bool await_ready() { 
+            return false;
             return m_ahb.m_ops[m_id] != nullptr;
           }
           void await_suspend(std::coroutine_handle<> h) {
             m_ahb.m_waiting_on_ops[m_id] = true;
-            m_ahb.m_ops[m_id] = nullptr;
+            if (m_ahb.m_ops[m_id] != nullptr) {
+              auto *op = m_ahb.m_ops[m_id];
+              m_ahb.m_ops[m_id] = nullptr;
+              
+              auto [dev, addr] = m_ahb.lookupBusDeviceAddress(op->addr);
+              auto &[q, busy] = m_ahb.m_busOps[dev];
+              busy = false;
+              op->complete();
+            }
           }
           MemoryOperation& await_resume() { 
             m_ahb.m_waiting_on_ops[m_id] = false;
@@ -55,15 +64,6 @@ namespace RP2040::Bus{
           AHB &m_ahb;
           uint32_t m_id;
         };
-        if (m_ops[id] != nullptr) {
-          auto *op = m_ops[id];
-          m_ops[id] = nullptr;
-          
-          auto [dev, addr] = lookupBusDeviceAddress(op->addr);
-          auto &[q, busy] = m_busOps[dev];
-          busy = false;
-          op->complete();
-        }
         return awaitable{*this, id};
       }
       enum BusDevice {

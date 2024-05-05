@@ -112,26 +112,6 @@ struct MemoryOperation{
 
 };
 
-// template<class Addr>
-// class IAsyncReadPort{
-// public:
-//   virtual Awaitable<uint8_t> read_byte(Addr addr) = 0;
-//   virtual Awaitable<uint16_t> read_halfword(Addr addr) = 0;
-//   virtual Awaitable<uint32_t> read_word(Addr addr) = 0;
-// protected:
-// private:
-// };
-
-// template<class Addr>
-// class IAsyncWritePort{
-// public:
-//   virtual Awaitable<void> write_byte(Addr addr, uint8_t in) = 0;
-//   virtual Awaitable<void> write_halfword(Addr addr, uint16_t in) = 0;
-//   virtual Awaitable<void> write_word(Addr addr, uint32_t in) = 0;
-// protected:
-// private:
-// };
-
 template<class Addr>
 class IAsyncReadWritePort{
 public:
@@ -165,6 +145,37 @@ protected:
 private:
 
 };
+
+inline void MemoryOperation::return_void() {
+  assert(is_write());
+  // DO NOT ENABLE THESE PRINTS THEY ADD 200MB TO THE LOGS PER MCYCLES
+  // std::cout << "MemoryOperation::return_void" << std::endl;
+  // m_port.deregister_op(*this);
+  // m_caller.resume();
+  // return awaiter{m_caller};
+}
+
+inline void MemoryOperation::return_value(uint32_t value) {
+  assert(is_read());
+  // DO NOT ENABLE THESE PRINTS THEY ADD 200MB TO THE LOGS PER MCYCLES
+  // std::cout << "MemoryOperation::return_value " << value << std::endl;
+  // m_port.deregister_op(*this);
+  data = value;
+  // m_caller.resume();
+  // return awaiter{m_caller};
+}
+
+inline void MemoryOperation::await_suspend(std::coroutine_handle<> h) {
+  m_caller = h;
+  // m_port.register_op(*this);
+}
+
+inline bool MemoryOperation::await_ready() {
+  // attempt to complete the operation immediately
+  // by registering the operation and observing the
+  // return value
+  return m_port.register_op(*this);
+}
 
 // template<class Addr>
 // class AsyncWriteAdapter : public IWritePort<Addr>, public IAsyncReadWritePort<Addr>{

@@ -26,7 +26,12 @@ Task ARMv6MCore::MPU::bus_task()
           op.return_value(out);
         } break;
       case MemoryOperation::READ_WORD:
-        op.return_value(co_await read_word_internal(op.addr));
+        if ((op.addr & 0xe000'0000) == 0xe000'0000) {
+          m_core.m_ppb.read_word(op.addr, out);
+        } else {
+          out = co_await m_bus_interface.read_word(op.addr);
+        }
+        op.return_value(out);
         break;
       case MemoryOperation::WRITE_BYTE:
         co_await write_byte_internal(op.addr, op.data);
