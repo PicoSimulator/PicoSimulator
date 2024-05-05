@@ -31,23 +31,39 @@ namespace RP2040{
 
   protected:
   private:
-    virtual void register_op(MemoryOperation &op) override final {
+    virtual bool register_op(MemoryOperation &op) override final {
       assert(m_op == nullptr);
       m_op = &op;
-      m_runner.resume();
+      if(m_waiting_on_op) {
+        // execute bus task without suspending caller
+        // m_waiting_on_op indicates that bus task is currently suspended
+        m_runner.resume();
+        // check if bus task is completed.
+      }
+      return m_waiting_on_op;
     }
-    virtual void deregister_op(MemoryOperation &op) override final {
-      assert(m_op == &op);
-      m_op = nullptr;
-    }
+    bool m_waiting_on_op = false;
     auto next_op(){
       struct awaitable{
-        bool await_ready() { return m_xip.m_op != nullptr; }
-        MemoryOperation &await_resume() { return *m_xip.m_op; }
+        bool await_ready() { 
+          return m_xip.m_op != nullptr; 
+          // return false;
+        }
+        MemoryOperation &await_resume() { 
+          m_xip.m_waiting_on_op = false;
+          return *m_xip.m_op; 
+        }
         void await_suspend(std::coroutine_handle<> handle) {
+          m_xip.m_waiting_on_op = true;
+          m_xip.m_op = nullptr;
         }
         XIP &m_xip;
       };
+      if (m_op != nullptr) {
+        auto *op = m_op;
+        m_op = nullptr;
+        op->complete();
+      }
       return awaitable{*this};
     }
     
@@ -57,34 +73,34 @@ namespace RP2040{
         // std::cout << "got op" << std::endl;
         switch (op.optype) {
           case MemoryOperation::READ_BYTE:
-            co_await op.return_value(m_flash[op.addr&0x00ff'ffff]);
+            op.return_value(m_flash[op.addr&0x00ff'ffff]);
             break;
           case MemoryOperation::READ_HALFWORD:
-            co_await op.return_value(*(uint16_t*)&m_flash[op.addr&0x00ff'ffff]);
+            op.return_value(*(uint16_t*)&m_flash[op.addr&0x00ff'ffff]);
             break;
           case MemoryOperation::READ_WORD:
             if ((op.addr & 0x0f00'0000) ==  0x0800'0000) {
               uint32_t out;
               m_ssi.read_word(op.addr, out);
-              co_await op.return_value(out);
+              op.return_value(out);
             } else {
-              co_await op.return_value(*(uint32_t*)&m_flash[op.addr&0x00ff'ffff]);
+              op.return_value(*(uint32_t*)&m_flash[op.addr&0x00ff'ffff]);
             }
             break;
           case MemoryOperation::WRITE_BYTE:
             // m_flash[op.addr] = op.data;
-            co_await op.return_void();
+            op.return_void();
             break;
           case MemoryOperation::WRITE_HALFWORD:
             // *(uint16_t*)&m_flash[op.addr] = op.data;
-            co_await op.return_void();
+            op.return_void();
             break;
           case MemoryOperation::WRITE_WORD:
             // *(uint32_t*)&m_flash[op.addr] = op.data;
             if ((op.addr & 0x0f00'0000) ==  0x0800'0000) {
               m_ssi.write_word(op.addr, op.data);
             }
-            co_await op.return_void();
+            op.return_void();
             break;
         }
       }

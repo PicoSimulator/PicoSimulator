@@ -67,7 +67,9 @@ class IAsyncReadWritePort;
 struct MemoryOperation{
   struct [[nodiscard]] awaiter {
     std::coroutine_handle<> caller;
-    bool await_ready() { return false; }
+    bool await_ready() { 
+      return false; 
+    }
     void await_suspend(std::coroutine_handle<> handle) {
       // std::cout << "resuming handle " << uintptr_t(this) << std::endl;
       // allow the caller to continue until next suspend point.
@@ -95,11 +97,13 @@ struct MemoryOperation{
   }
   IAsyncReadWritePort<uint32_t> &m_port;
   std::coroutine_handle<> m_caller = nullptr;
-  awaiter return_void() ;
-  awaiter return_value(uint32_t value);
-  bool await_ready() { 
-    return false;
+  void return_void() ;
+  void return_value(uint32_t value);
+  void complete() {
+    if (m_caller)
+      m_caller.resume();
   }
+  bool await_ready();
   void await_suspend(std::coroutine_handle<> handle);
   uint32_t await_resume() {
     return data;
@@ -155,8 +159,8 @@ public:
     // std::cout << "write_word " << std::hex << addr << ":" << in <<  std::endl;
     return MemoryOperation{addr, in, MemoryOperation::WRITE_WORD, *this};
   }
-  virtual void register_op(MemoryOperation &op) = 0;
-  virtual void deregister_op(MemoryOperation &op) = 0;
+  virtual bool register_op(MemoryOperation &op) = 0;
+  // virtual void deregister_op(MemoryOperation &op) = 0;
 protected:
 private:
 

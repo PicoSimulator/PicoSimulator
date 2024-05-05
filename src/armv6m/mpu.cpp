@@ -19,26 +19,26 @@ Task ARMv6MCore::MPU::bus_task()
     // std::cout << "MPU::bus_task() " << m_core.m_name << " " << op.addr << " " << op.optype << " " << op.data << std::endl;
     switch(op.optype) {
       case MemoryOperation::READ_BYTE:
-        co_await op.return_value(co_await read_byte_internal(op.addr));
+        op.return_value(co_await read_byte_internal(op.addr));
         break;
       case MemoryOperation::READ_HALFWORD:{
           out = co_await m_bus_interface.read_halfword(op.addr);
-          co_await op.return_value(out);
+          op.return_value(out);
         } break;
       case MemoryOperation::READ_WORD:
-        co_await op.return_value(co_await read_word_internal(op.addr));
+        op.return_value(co_await read_word_internal(op.addr));
         break;
       case MemoryOperation::WRITE_BYTE:
         co_await write_byte_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
       case MemoryOperation::WRITE_HALFWORD:
         co_await write_halfword_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
       case MemoryOperation::WRITE_WORD:
         co_await write_word_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
     }
   }

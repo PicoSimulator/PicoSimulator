@@ -48,16 +48,12 @@ namespace RP2040::Bus{
     UART &uart0() { return m_uart0; }
     UART &uart1() { return m_uart1; }
   protected:
-    virtual void register_op(MemoryOperation &op) override final{
+    virtual bool register_op(MemoryOperation &op) override final{
       assert(m_op == nullptr);
       m_op = &op;
       if(m_waiting_on_op)
         m_runner.resume();
-    }
-    virtual void deregister_op(MemoryOperation &op) override final{
-      assert(m_op == &op);
-      m_op = nullptr;
-      m_waiting_on_op = false;
+      return m_waiting_on_op;
     }
   private:
     MemoryOperation *m_op;
@@ -65,13 +61,24 @@ namespace RP2040::Bus{
     bool m_waiting_on_op;
     auto next_op(){
       struct awaitable{
-        bool await_ready() { return m_bus.m_op != nullptr; }
-        MemoryOperation &await_resume() { return *m_bus.m_op; }
+        bool await_ready() { \
+          return m_bus.m_op != nullptr; 
+        }
+        MemoryOperation &await_resume() { 
+          m_bus.m_waiting_on_op = false;
+          return *m_bus.m_op; 
+        }
         void await_suspend(std::coroutine_handle<> handle) {
           m_bus.m_waiting_on_op = true;
+          m_bus.m_op = nullptr;
         }
         APB &m_bus;
       };
+      if (m_op != nullptr) {
+        auto *op = m_op;
+        m_op = nullptr;
+        op->complete();
+      }
       return awaitable{*this};
     }
     Task bus_task();

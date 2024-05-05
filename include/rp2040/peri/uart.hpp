@@ -123,8 +123,8 @@ private:
   };
 
   void subtick() {
-    std::cout << "UART_SUBTICK" << std::endl;
-    std::cout << std::bitset<32>{m_control} << std::endl;
+    // std::cout << "UART_SUBTICK" << std::endl;
+    // std::cout << std::bitset<32>{m_control} << std::endl;
     if (m_control & Control::TX_EN && m_shift_out_counter == 0 && !m_tx_fifo.empty()) {
       m_shift_out_counter = wordlength();
       char c = m_tx_fifo.pop();

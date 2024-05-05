@@ -98,30 +98,42 @@ public:
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) = 0;
   virtual PortState write_word_internal(uint32_t addr, uint32_t in) = 0;
-  virtual void register_op(MemoryOperation &op) override final{
+  virtual bool register_op(MemoryOperation &op) override final{
     assert(m_op == nullptr);
     m_op = &op;
     if(m_waiting_on_op)
       m_runner.resume();
+    return m_waiting_on_op;
   }
-  virtual void deregister_op(MemoryOperation &op) override final{
-    assert(m_op == &op);
-    m_op = nullptr;
-    m_waiting_on_op = false;
-  }
+  // virtual void deregister_op(MemoryOperation &op) override final{
+  //   assert(m_op == &op);
+  //   m_op = nullptr;
+  //   m_waiting_on_op = false;
+  // }
 private:
   MemoryOperation *m_op;
   std::coroutine_handle<> m_runner;
   bool m_waiting_on_op;
   auto next_op(){
     struct awaitable{
-      bool await_ready() { return m_bus.m_op != nullptr; }
-      MemoryOperation &await_resume() { return *m_bus.m_op; }
+      bool await_ready() { 
+        return m_bus.m_op != nullptr; 
+      }
+      MemoryOperation &await_resume() { 
+        m_bus.m_waiting_on_op = false;
+        return *m_bus.m_op; 
+      }
       void await_suspend(std::coroutine_handle<> handle) {
         m_bus.m_waiting_on_op = true;
+        m_bus.m_op = nullptr;
       }
       IInterposedPeripheralPort &m_bus;
     };
+    if (m_op != nullptr) {
+      auto *op = m_op;
+      m_op = nullptr;
+      op->complete();
+    }
     return awaitable{*this};
   }
   Task bus_task()
@@ -130,25 +142,25 @@ private:
       auto &op = co_await next_op();
       switch(op.optype) {
         case MemoryOperation::READ_BYTE:
-          co_await op.return_value(co_await read_byte_internal2(op.addr));
+          op.return_value(co_await read_byte_internal2(op.addr));
           break;
         case MemoryOperation::READ_HALFWORD:
-          co_await op.return_value(co_await read_halfword_internal2(op.addr));
+          op.return_value(co_await read_halfword_internal2(op.addr));
           break;
         case MemoryOperation::READ_WORD:
-          co_await op.return_value(co_await read_word_internal2(op.addr));
+          op.return_value(co_await read_word_internal2(op.addr));
           break;
         case MemoryOperation::WRITE_BYTE:
           co_await write_byte_internal2(op.addr, op.data);
-          co_await op.return_void();
+          op.return_void();
           break;
         case MemoryOperation::WRITE_HALFWORD:
           co_await write_halfword_internal2(op.addr, op.data);
-          co_await op.return_void();
+          op.return_void();
           break;
         case MemoryOperation::WRITE_WORD:
           co_await write_word_internal2(op.addr, op.data);
-          co_await op.return_void();
+          op.return_void();
           break;  
       }
     }

@@ -157,30 +157,42 @@ namespace ARMv6M{
       Awaitable<void> write_halfword_internal(uint32_t addr, uint16_t in);
       Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
     protected:
-      virtual void register_op(MemoryOperation &op) override final{
+      virtual bool register_op(MemoryOperation &op) override final{
         assert(m_op == nullptr);
         m_op = &op;
         if(m_waiting_on_op)
           m_runner.resume();
+        return m_waiting_on_op;
       }
-      virtual void deregister_op(MemoryOperation &op) override final{
-        assert(m_op == &op);
-        m_op = nullptr;
-        m_waiting_on_op = false;
-      }
+      // virtual void deregister_op(MemoryOperation &op) override final{
+      //   assert(m_op == &op);
+      //   m_op = nullptr;
+      //   m_waiting_on_op = false;
+      // }
     private:
       MemoryOperation *m_op;
       std::coroutine_handle<> m_runner;
       bool m_waiting_on_op;
       auto next_op(){
         struct awaitable{
-          bool await_ready() { return m_bus.m_op != nullptr; }
-          MemoryOperation &await_resume() { return *m_bus.m_op; }
+          bool await_ready() {
+            return m_bus.m_op != nullptr; 
+          }
+          MemoryOperation &await_resume() { 
+            m_bus.m_waiting_on_op = false;
+            return *m_bus.m_op; 
+          }
           void await_suspend(std::coroutine_handle<> handle) {
             m_bus.m_waiting_on_op = true;
+            m_bus.m_op = nullptr;
           }
           MPU &m_bus;
         };
+        if (m_op != nullptr) {
+          auto *op = m_op;
+          m_op = nullptr;
+          op->complete();
+        }
         return awaitable{*this};
       }
       Task bus_task();

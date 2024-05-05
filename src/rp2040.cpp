@@ -39,7 +39,7 @@ void RP2040::RP2040::reset()
 void RP2040::RP2040::run()
 {
   int ticks = 0;
-  while (ticks++ < 1000000) {
+  while (ticks++ < 1'000'000) {
     // std::cout << "\nTICK " << ticks << std::endl;
     clk_sys.tick();
     clk_ref.tick();
@@ -79,34 +79,34 @@ Task RP2040::RP2040::CoreBus::bus_task()
     auto &op = co_await next_op();
     switch(op.optype) {
       case MemoryOperation::READ_BYTE:
-        co_await op.return_value(co_await read_byte_internal(op.addr));
+        op.return_value(co_await read_byte_internal(op.addr));
         break;
       case MemoryOperation::READ_HALFWORD:{
           uint32_t addr = op.addr;
           if ((addr & 0xf000'0000) == 0xd000'0000) {
             uint16_t val;
             m_ioport.read_halfword(addr, val);
-            co_await op.return_value(val);
+            op.return_value(val);
           } else {
-            co_await op.return_value(co_await m_ahb.read_halfword(addr));
+            op.return_value(co_await m_ahb.read_halfword(addr));
           }
         }
         break;
       case MemoryOperation::READ_WORD:
-        co_await op.return_value(co_await read_word_internal(op.addr));
+        op.return_value(co_await read_word_internal(op.addr));
         break;
       case MemoryOperation::WRITE_BYTE:
         co_await write_byte_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
       case MemoryOperation::WRITE_HALFWORD:
         co_await write_halfword_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
       case MemoryOperation::WRITE_WORD:
         // std::cout << "CoreBus::bus_task WRITE_WORD " << std::hex << op.addr << ":" << op.data << std::dec << std::endl;
         co_await write_word_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
     }
   }

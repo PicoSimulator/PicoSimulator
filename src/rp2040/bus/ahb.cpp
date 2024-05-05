@@ -32,7 +32,7 @@ void AHB::tick()
     }
   }
 }
-void AHB::register_op(MemoryOperation &op)
+bool AHB::register_op(MemoryOperation &op)
 {
   // std::cout << "register_op" << std::endl;
 
@@ -40,23 +40,24 @@ void AHB::register_op(MemoryOperation &op)
 
   auto &[q, busy] = m_busOps[dev];
   q.push(op);
+  return false;
 }
 
-void AHB::deregister_op(MemoryOperation &op)
-{
-  // std::cout << "deregister_op" << std::endl;
-  auto [dev, addr] = lookupBusDeviceAddress(op.addr);
-  auto &[q, busy] = m_busOps[dev];
-  // if (q.empty())
-  busy = false;
-  for (int i = 0; i < 4; i++) {
-    if (m_ops[i] == &op) {
-      m_ops[i] = nullptr;
-      return;
-    }
-  }
-  assert(false);
-}
+// void AHB::deregister_op(MemoryOperation &op)
+// {
+//   // std::cout << "deregister_op" << std::endl;
+//   auto [dev, addr] = lookupBusDeviceAddress(op.addr);
+//   auto &[q, busy] = m_busOps[dev];
+//   // if (q.empty())
+//   busy = false;
+//   for (int i = 0; i < 4; i++) {
+//     if (m_ops[i] == &op) {
+//       m_ops[i] = nullptr;
+//       return;
+//     }
+//   }
+//   assert(false);
+// }
 
 Task AHB::bus_task(uint32_t id)
 {
@@ -65,7 +66,7 @@ Task AHB::bus_task(uint32_t id)
     // std::cout << "AHB::bus_task(" << id << ")" << std::endl;
     switch(op.optype) {
       case MemoryOperation::OpType::READ_BYTE: 
-        co_await op.return_value(co_await read_byte_internal(op.addr));
+        op.return_value(co_await read_byte_internal(op.addr));
         break;
       case MemoryOperation::OpType::READ_HALFWORD: {
           auto val = lookupBusDeviceAddress(op.addr);
@@ -85,23 +86,23 @@ Task AHB::bus_task(uint32_t id)
             default: throw ARMv6M::BusFault{op.addr};
           }
           // std::cout << "read_halfword(" << std::hex << addr << std::dec << ") completed" << std::endl;
-          co_await op.return_value(out);
+          op.return_value(out);
       }
         break;
       case MemoryOperation::OpType::READ_WORD: 
-        co_await op.return_value(co_await read_word_internal(op.addr));
+        op.return_value(co_await read_word_internal(op.addr));
         break;
       case MemoryOperation::OpType::WRITE_BYTE: 
         co_await write_byte_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
       case MemoryOperation::OpType::WRITE_HALFWORD: 
         co_await write_halfword_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
       case MemoryOperation::OpType::WRITE_WORD: 
         co_await write_word_internal(op.addr, op.data);
-        co_await op.return_void();
+        op.return_void();
         break;
     }
   }

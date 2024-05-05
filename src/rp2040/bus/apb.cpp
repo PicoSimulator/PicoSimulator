@@ -38,25 +38,25 @@ Task APB::bus_task()
     auto &op = co_await next_op();
     switch(m_op->optype) {
       case MemoryOperation::READ_BYTE:
-        co_await m_op->return_value(co_await read_byte_internal(m_op->addr));
+        m_op->return_value(co_await read_byte_internal(m_op->addr));
         break;
       case MemoryOperation::READ_HALFWORD:
-        co_await m_op->return_value(co_await read_halfword_internal(m_op->addr));
+        m_op->return_value(co_await read_halfword_internal(m_op->addr));
         break;
       case MemoryOperation::READ_WORD:
-        co_await m_op->return_value(co_await read_word_internal(m_op->addr));
+        m_op->return_value(co_await read_word_internal(m_op->addr));
         break;
       case MemoryOperation::WRITE_BYTE:
         co_await write_byte_internal(m_op->addr, m_op->data);
-        co_await m_op->return_void();
+        m_op->return_void();
         break;
       case MemoryOperation::WRITE_HALFWORD:
         co_await write_halfword_internal(m_op->addr, m_op->data);
-        co_await m_op->return_void();
+        m_op->return_void();
         break;
       case MemoryOperation::WRITE_WORD:
         co_await write_word_internal(m_op->addr, m_op->data);
-        co_await m_op->return_void();
+        m_op->return_void();
         break;
     }
   }

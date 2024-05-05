@@ -23,8 +23,8 @@ namespace RP2040::Bus{
       {}
       virtual void tick() override;
     protected:
-      virtual void register_op(MemoryOperation &op) override final;
-      virtual void deregister_op(MemoryOperation &op) override final;
+      virtual bool register_op(MemoryOperation &op) override final;
+      // virtual void deregister_op(MemoryOperation &op) override final;
       Awaitable<uint8_t> read_byte_internal(uint32_t addr);
       Awaitable<uint16_t> read_halfword_internal(uint32_t addr);
       Awaitable<uint32_t> read_word_internal(uint32_t addr);
@@ -32,6 +32,7 @@ namespace RP2040::Bus{
       Awaitable<void> write_halfword_internal(uint32_t addr, uint16_t in);
       Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
     private:
+      bool m_waiting_on_ops[4] = {false,false,false,false};
       auto next_op(uint32_t id)
       {
         // std::cout << "AHB::next_op()" << std::endl;
@@ -40,16 +41,29 @@ namespace RP2040::Bus{
            : m_ahb{ahb}
            , m_id{id}
            {}
-          bool await_ready() { return false; }
-          void await_suspend(std::coroutine_handle<> h) {
-            if (m_ahb.m_ops[m_id] != nullptr) {
-              m_ahb.m_ops[m_id]->m_caller.resume();
-            }
+          bool await_ready() { 
+            return m_ahb.m_ops[m_id] != nullptr;
           }
-          MemoryOperation& await_resume() { return *m_ahb.m_ops[m_id]; }
+          void await_suspend(std::coroutine_handle<> h) {
+            m_ahb.m_waiting_on_ops[m_id] = true;
+            m_ahb.m_ops[m_id] = nullptr;
+          }
+          MemoryOperation& await_resume() { 
+            m_ahb.m_waiting_on_ops[m_id] = false;
+            return *m_ahb.m_ops[m_id]; 
+          }
           AHB &m_ahb;
           uint32_t m_id;
         };
+        if (m_ops[id] != nullptr) {
+          auto *op = m_ops[id];
+          m_ops[id] = nullptr;
+          
+          auto [dev, addr] = lookupBusDeviceAddress(op->addr);
+          auto &[q, busy] = m_busOps[dev];
+          busy = false;
+          op->complete();
+        }
         return awaitable{*this, id};
       }
       enum BusDevice {
