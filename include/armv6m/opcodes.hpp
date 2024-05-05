@@ -1575,10 +1575,14 @@
       uint32_t I1 = (opcode >> 13) &1;\
       uint32_t I2 = (opcode >> 11) &1;\
       uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23)) - (1<<24);\
-      uint32_t addr = m_nextPC + imm32;\
-      std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
-      LR() = m_nextPC;\
-      m_nextPC = addr;\
+      do_exec({\
+        uint32_t addr = m_nextPC + imm32;\
+        do_trace({\
+          std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
+        })\
+        LR() = m_nextPC;\
+        m_nextPC = addr;\
+      })\
     }\
   }
 
@@ -1593,10 +1597,14 @@
       uint32_t I1 = 1^((opcode >> 13) &1);\
       uint32_t I2 = 1^((opcode >> 11) &1);\
       uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23));\
-      uint32_t addr = m_nextPC + imm32;\
-      std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
-      LR() = m_nextPC;\
-      m_nextPC = addr;\
+      do_exec({\
+        uint32_t addr = m_nextPC + imm32;\
+        do_trace({\
+          std::cout << "BL " << std::hex << addr << std::dec << std::endl;\
+        })\
+        LR() = m_nextPC;\
+        m_nextPC = addr;\
+      })\
     }\
   }
 
