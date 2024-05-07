@@ -36,11 +36,12 @@ void RP2040::RP2040::reset()
   m_cores[1].reset();
 }
 
-void RP2040::RP2040::run()
+void RP2040::RP2040::run(int max_ticks)
 {
   int ticks = 0;
-  while (ticks++ < 1'000'000) {
-    // std::cout << "\nTICK " << ticks << std::endl;
+  // while (ticks++ <= 1'000'000) {
+  while (ticks++ <= max_ticks) {
+    // std::cout << "\nTICK " << std::dec << ticks << std::endl;
     clk_sys.tick();
     clk_ref.tick();
     clk_peri.tick();
@@ -73,101 +74,58 @@ UART &RP2040::RP2040::UART0()
   return m_apb.uart0();
 }
 
+#define READ(wordtype, ctype, out) \
+  {\
+    ctype out2; \
+    if ((op.addr & 0xf000'0000U) == 0xd000'0000U) { \
+      m_ioport.read_##wordtype (op.addr, out2); \
+    } else { \
+      out2 = co_await m_ahb.read_##wordtype (op.addr); \
+    }\
+    out = out2;}
+
+#define WRITE(wordtype) \
+  if ((op.addr & 0xf000'0000U) == 0xd000'0000U) { \
+    m_ioport.write_##wordtype (op.addr, op.data); \
+  } else { \
+    co_await m_ahb.write_##wordtype (op.addr, op.data); \
+  }
+
 Task RP2040::RP2040::CoreBus::bus_task()
 {
   while(true) {
     auto &op = co_await next_op();
+    uint32_t out;
     switch(op.optype) {
       case MemoryOperation::READ_BYTE:
-        op.return_value(co_await read_byte_internal(op.addr));
+        READ(byte, uint8_t, out);
+        op.return_value(out);
         break;
-      case MemoryOperation::READ_HALFWORD:{
-          uint32_t addr = op.addr;
-          if ((addr & 0xf000'0000) == 0xd000'0000) {
-            uint16_t val;
-            m_ioport.read_halfword(addr, val);
-            op.return_value(val);
-          } else {
-            op.return_value(co_await m_ahb.read_halfword(addr));
-          }
-        }
+      case MemoryOperation::READ_HALFWORD:
+          READ(halfword, uint16_t, out);
+          op.return_value(out);
         break;
-      case MemoryOperation::READ_WORD:
-        op.return_value(co_await read_word_internal(op.addr));
+      case MemoryOperation::READ_WORD:{
+        READ(word, uint32_t, out);
+        op.return_value(out);
         break;
+      }
       case MemoryOperation::WRITE_BYTE:
-        co_await write_byte_internal(op.addr, op.data);
+        WRITE(byte);
         op.return_void();
         break;
       case MemoryOperation::WRITE_HALFWORD:
-        co_await write_halfword_internal(op.addr, op.data);
+        WRITE(halfword);
         op.return_void();
         break;
       case MemoryOperation::WRITE_WORD:
-        // std::cout << "CoreBus::bus_task WRITE_WORD " << std::hex << op.addr << ":" << op.data << std::dec << std::endl;
-        co_await write_word_internal(op.addr, op.data);
+        WRITE(word);
         op.return_void();
         break;
     }
   }
 
 }
-
-Awaitable<uint8_t> RP2040::RP2040::CoreBus::read_byte_internal(uint32_t addr)
-{
-  if ((addr & 0xf000'0000) == 0xd000'0000) {
-    uint8_t val;
-    m_ioport.read_byte(addr, val);
-    co_return val;
-  }
-  co_return co_await m_ahb.read_byte(addr);
-}
-Awaitable<uint16_t> RP2040::RP2040::CoreBus::read_halfword_internal(uint32_t addr)
-{
-  if ((addr & 0xf000'0000) == 0xd000'0000) {
-    uint16_t val;
-    m_ioport.read_halfword(addr, val);
-    co_return val;
-  }
-  co_return co_await m_ahb.read_halfword(addr);
-}
-Awaitable<uint32_t> RP2040::RP2040::CoreBus::read_word_internal(uint32_t addr)
-{
-  // std::cout << "CoreBus::read_word " << std::hex << addr << std::dec << std::endl;
-  if ((addr & 0xf000'0000) == 0xd000'0000) {
-    uint32_t val;
-    m_ioport.read_word(addr, val);
-    co_return val;
-  }
-  co_return co_await m_ahb.read_word(addr);
-}
-
-Awaitable<void> RP2040::RP2040::CoreBus::write_byte_internal(uint32_t addr, uint8_t val)
-{
-  if ((addr & 0xf000'0000) == 0xd000'0000) {
-    m_ioport.write_byte(addr, val);
-  } else {
-    co_await m_ahb.write_byte(addr, val);
-  }
-}
-Awaitable<void> RP2040::RP2040::CoreBus::write_halfword_internal(uint32_t addr, uint16_t val)
-{
-  if ((addr & 0xf000'0000) == 0xd000'0000) {
-    m_ioport.write_halfword(addr, val);
-  } else {
-    co_await m_ahb.write_halfword(addr, val);
-  }
-}
-Awaitable<void> RP2040::RP2040::CoreBus::write_word_internal(uint32_t addr, uint32_t val)
-{
-  // std::cout << "CoreBus::write_word " << std::hex << addr << std::dec << "\n";
-  if ((addr & 0xf000'0000) == 0xd000'0000) {
-    m_ioport.write_word(addr, val);
-  } else {
-    co_await m_ahb.write_word(addr, val);
-  }
-}
-
 
 PortState RP2040::RP2040::IOPort::read_byte(uint32_t addr, uint8_t &out){ 
   uint32_t out2;
@@ -203,8 +161,8 @@ PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){
   #undef SPINLOCKS_EVAL
   return PortState::SUCCESS; 
 }
-PortState RP2040::RP2040::IOPort::write_byte(uint32_t addr, uint8_t in){ throw ARMv6M::BusFault(); }
-PortState RP2040::RP2040::IOPort::write_halfword(uint32_t addr, uint16_t in){ throw ARMv6M::BusFault(); }
+PortState RP2040::RP2040::IOPort::write_byte(uint32_t addr, uint8_t in){ throw ARMv6M::BusFault(addr); }
+PortState RP2040::RP2040::IOPort::write_halfword(uint32_t addr, uint16_t in){ throw ARMv6M::BusFault(addr); }
 PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){ 
   // std::cout << "IOPort::write_word(" << std::hex << addr << ", " << in << std::dec << ")" << std::endl;
   #define SPINLOCKS_EVAL(num) case (0xd000'0100 + 4*num): m_spinlocks.unlock(num); break;

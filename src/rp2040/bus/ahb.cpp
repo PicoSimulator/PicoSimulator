@@ -100,7 +100,7 @@ Task AHB::bus_task(uint32_t id)
           case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_word(m_rp2040.SRAM5(), offset); break;
           case BusDevice::APB: out = co_await m_rp2040.APB().read_word(op.addr); break;
           case BusDevice::XIP: out = co_await m_rp2040.XIP().read_word(op.addr); break;
-          default: throw ARMv6M::BusFault{};
+          default: throw ARMv6M::BusFault{op.addr};
         }        
         op.return_value(out);
       } break;
@@ -155,7 +155,7 @@ inline std::tuple<AHB::BusDevice, uint32_t> AHB::lookupBusDeviceAddress(uint32_t
     case 0x5000'0000:
       return {BusDevice::AHBLITE, addr&0x00ff'ffff};
   }
-  throw ARMv6M::BusFault();
+  throw ARMv6M::BusFault(addr);
 }
 
 Awaitable<uint8_t> AHB::read_byte_internal(uint32_t addr) 
@@ -217,7 +217,7 @@ Awaitable<uint32_t> AHB::read_word_internal(uint32_t addr)
     case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_word(m_rp2040.SRAM5(), offset); break;
     case BusDevice::APB: out = co_await m_rp2040.APB().read_word(addr); break;
     case BusDevice::XIP: out = co_await m_rp2040.XIP().read_word(addr); break;
-    default: throw ARMv6M::BusFault{};
+    default: throw ARMv6M::BusFault{addr};
   }
   // std::cout << "read_word(" << std::hex << addr << std::dec << ") completed " << out << std::endl;
   co_return out;

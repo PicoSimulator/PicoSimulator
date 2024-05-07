@@ -97,13 +97,6 @@ BusMaster ARMv6MCore::core_task()
           }
         }
         m_nextPC = PC() + instr_incr;
-        // std::cout << "fetch complete " << m_name << " instr: "
-        //   << std::hex << std::setw(8) << std::setfill('0') << instr << std::dec
-        //   << " addr: "
-        //   << std::hex << std::setw(8) << std::setfill('0') << PC() << std::dec
-        //   << std::endl;
-
-        // co_await exec_instr(instr);
         
         #define DO(x) {x}
         #define DO_DISAS(x) {std::cout << "D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
@@ -264,47 +257,8 @@ BusMaster ARMv6MCore::core_task()
   }
 }
 
-Awaitable<void> ARMv6MCore::exec_instr(uint32_t instr)
-{
-  #define DO(x) {x}
-  #define DO_DISAS(x) {std::cout << "D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
-  #define DO_TRACE(x) {std::cout << "T:";  {x}}
-  #define DO2(x, y) {x}{y}
-  #define DONT(x) 
-
-  #define OPCODE(prefix, fun) \
-    case prefix: \
-      fun(instr, DONT, DO, DONT, this); \
-      break;
-
-  #define REP0 OPCODE
-
-  #define REP1(prefix, fun) \
-    REP0(prefix##0, fun) \
-    REP0(prefix##1, fun) \
-
-  #define REP2(prefix, fun) \
-    REP1(prefix##0, fun) \
-    REP1(prefix##1, fun) \
-
-  #define REP3(prefix, fun) \
-    REP2(prefix##0, fun) \
-    REP2(prefix##1, fun) \
-
-  switch(instr >> 25) {
-    ENUM_OPCODES(REP0)
-  }
-  #undef OPCODE
-  #undef REP1
-  #undef REP2
-  #undef REP3
-  #undef REP4
-  co_return;
-}
-
-
-PortState ARMv6MCore::PPB::read_byte(uint32_t addr, uint8_t &out){ throw ARMv6M::BusFault(); }
-PortState ARMv6MCore::PPB::read_halfword(uint32_t addr, uint16_t &out){ throw ARMv6M::BusFault(); }
+PortState ARMv6MCore::PPB::read_byte(uint32_t addr, uint8_t &out){ throw ARMv6M::BusFault(addr); }
+PortState ARMv6MCore::PPB::read_halfword(uint32_t addr, uint16_t &out){ throw ARMv6M::BusFault(addr); }
 PortState ARMv6MCore::PPB::read_word(uint32_t addr, uint32_t &out){
   std::cout << "PPB::read_word(" << std::hex << addr << std::dec << ")" << std::endl;
   switch(addr) {
@@ -377,8 +331,8 @@ PortState ARMv6MCore::PPB::read_word(uint32_t addr, uint32_t &out){
   }
   return PortState::SUCCESS;
 }
-PortState ARMv6MCore::PPB::write_byte(uint32_t addr, uint8_t in){ throw ARMv6M::BusFault(); }
-PortState ARMv6MCore::PPB::write_halfword(uint32_t addr, uint16_t in){ throw ARMv6M::BusFault(); }
+PortState ARMv6MCore::PPB::write_byte(uint32_t addr, uint8_t in){ throw ARMv6M::BusFault(addr); }
+PortState ARMv6MCore::PPB::write_halfword(uint32_t addr, uint16_t in){ throw ARMv6M::BusFault(addr); }
 PortState ARMv6MCore::PPB::write_word(uint32_t addr, uint32_t in){
   switch(addr) {
     case 0xE000ED00: // CPUID

@@ -17,12 +17,14 @@
 namespace RP2040{
   class XIP final : public IAsyncReadWritePort<uint32_t>, public IClockable{
   public:
-    XIP(SSI &ssi) : m_ssi{ssi}, m_runner{run().get_handle()} {
+    XIP(SSI &ssi) : m_ssi{ssi}, m_runner{bus_task().get_handle()} {
       for (auto &tag_set : m_cache_tags) {
         for (auto &tag : tag_set) {
           tag = {false, 0};
         }
       }
+      m_hit_counter = 0;
+      m_acc_counter = 0;
     }
     void load_binary_data(const std::span<uint8_t> data){
       std::copy(data.begin(), data.end(), m_flash.begin());
@@ -67,44 +69,7 @@ namespace RP2040{
       return awaitable{*this};
     }
     
-    Task run(){
-      while(true) {
-        auto &op = co_await next_op();
-        // std::cout << "got op" << std::endl;
-        switch (op.optype) {
-          case MemoryOperation::READ_BYTE:
-            op.return_value(m_flash[op.addr&0x00ff'ffff]);
-            break;
-          case MemoryOperation::READ_HALFWORD:
-            op.return_value(*(uint16_t*)&m_flash[op.addr&0x00ff'ffff]);
-            break;
-          case MemoryOperation::READ_WORD:
-            if ((op.addr & 0x0f00'0000) ==  0x0800'0000) {
-              uint32_t out;
-              m_ssi.read_word(op.addr, out);
-              op.return_value(out);
-            } else {
-              op.return_value(*(uint32_t*)&m_flash[op.addr&0x00ff'ffff]);
-            }
-            break;
-          case MemoryOperation::WRITE_BYTE:
-            // m_flash[op.addr] = op.data;
-            op.return_void();
-            break;
-          case MemoryOperation::WRITE_HALFWORD:
-            // *(uint16_t*)&m_flash[op.addr] = op.data;
-            op.return_void();
-            break;
-          case MemoryOperation::WRITE_WORD:
-            // *(uint32_t*)&m_flash[op.addr] = op.data;
-            if ((op.addr & 0x0f00'0000) ==  0x0800'0000) {
-              m_ssi.write_word(op.addr, op.data);
-            }
-            op.return_void();
-            break;
-        }
-      }
-    }
+    Task bus_task();
     //hack for now to make this work!
     std::array<uint8_t, 0x0100'0000> m_flash;
 

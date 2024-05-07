@@ -10,8 +10,12 @@ public:
   void reset() { set(0); }
   T operator++() { T v = m_counter; increment(); return v; }
   T operator++(int) { increment(); return m_counter; }
+  T operator--() { T v = m_counter; decrement(); return v; }
+  T operator--(int) { decrement(); return m_counter; }
+  T operator=(T t) { m_counter = t; return m_counter; }
 protected:
 private:
+  void decrement() { if (m_counter > std::numeric_limits<T>::min()) m_counter--; }
   void increment() { if (m_counter < std::numeric_limits<T>::max()) m_counter++; }
   T m_counter;
 };

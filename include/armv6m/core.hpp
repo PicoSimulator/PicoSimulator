@@ -70,6 +70,8 @@ namespace ARMv6M{
     void BranchWritePC(uint32_t target) { BranchTo(target&~1); }
     void ALUWritePC(uint32_t target) { BranchWritePC(target); }
     void LoadWritePC(uint32_t target) { BXWritePC(target); }
+    bool EventRegistered()  const { return false; }
+    void ClearEventRegister() {}
 
     // enum ProcessorMode{
     //   ThreadMode = 0b10000,
@@ -150,12 +152,6 @@ namespace ARMv6M{
     class MPU final : public IAsyncReadWritePort<uint32_t>{
     public:
       MPU(IAsyncReadWritePort<uint32_t> &bus, ARMv6MCore &core);
-      Awaitable<uint8_t> read_byte_internal(uint32_t addr);
-      Awaitable<uint16_t> read_halfword_internal(uint32_t addr);
-      Awaitable<uint32_t> read_word_internal(uint32_t addr);
-      Awaitable<void> write_byte_internal(uint32_t addr, uint8_t in);
-      Awaitable<void> write_halfword_internal(uint32_t addr, uint16_t in);
-      Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
     protected:
       virtual bool register_op(MemoryOperation &op) override final{
         assert(m_op == nullptr);
@@ -164,11 +160,6 @@ namespace ARMv6M{
           m_runner.resume();
         return m_waiting_on_op;
       }
-      // virtual void deregister_op(MemoryOperation &op) override final{
-      //   assert(m_op == &op);
-      //   m_op = nullptr;
-      //   m_waiting_on_op = false;
-      // }
     private:
       MemoryOperation *m_op;
       std::coroutine_handle<> m_runner;
@@ -176,6 +167,7 @@ namespace ARMv6M{
       auto next_op(){
         struct awaitable{
           bool await_ready() {
+            return false;
             return m_bus.m_op != nullptr; 
           }
           MemoryOperation &await_resume() { 
@@ -184,15 +176,19 @@ namespace ARMv6M{
           }
           void await_suspend(std::coroutine_handle<> handle) {
             m_bus.m_waiting_on_op = true;
-            m_bus.m_op = nullptr;
+            if (m_bus.m_op != nullptr) {
+              auto *op = m_bus.m_op;
+              m_bus.m_op = nullptr;
+              op->complete();
+            }
           }
           MPU &m_bus;
         };
-        if (m_op != nullptr) {
-          auto *op = m_op;
-          m_op = nullptr;
-          op->complete();
-        }
+        // if (m_op != nullptr) {
+        //   auto *op = m_op;
+        //   m_op = nullptr;
+        //   op->complete();
+        // }
         return awaitable{*this};
       }
       Task bus_task();

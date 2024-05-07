@@ -4,6 +4,7 @@
 struct MyArgs : public argparse::Args {
   std::string &binary = arg("flash_binary", "Path to binary file to load into flash");
   std::optional<std::string> &uart0 = kwarg("uart0", "Path to UART0 file, can be PTY");
+  int &max_ticks = kwarg("max_ticks", "Number of ticks to run").set_default(std::numeric_limits<int>::max());
 };
 
 RP2040::RP2040 g_rp2040{};
@@ -19,5 +20,5 @@ int main(int argc, char** argv)
   }
 
   g_rp2040.reset();
-  g_rp2040.run();
+  g_rp2040.run(args.max_ticks);
 }

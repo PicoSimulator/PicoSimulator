@@ -32,7 +32,7 @@ namespace RP2040{
   public:
     RP2040();
     virtual void reset() override;
-    void run();
+    void run(int max_ticks);
     void load_binary(const std::string &path);
     UART &UART0();
     Bus::APB &APB() { return m_apb; }
@@ -119,22 +119,24 @@ namespace RP2040{
       bool m_waiting_on_op;
       auto next_op(){
         struct awaitable{
-          bool await_ready() { return m_bus.m_op != nullptr; }
+          bool await_ready() { 
+            return false;
+            return m_bus.m_op != nullptr; 
+          }
           MemoryOperation &await_resume() { 
             m_bus.m_waiting_on_op = false;
             return *m_bus.m_op; 
           }
           void await_suspend(std::coroutine_handle<> handle) {
             m_bus.m_waiting_on_op = true;
-            m_bus.m_op = nullptr;
+            if (m_bus.m_op != nullptr) {
+              auto *op = m_bus.m_op;
+              m_bus.m_op = nullptr;
+              op->complete();
+            }
           }
           CoreBus &m_bus;
         };
-        if (m_op != nullptr) {
-          auto *op = m_op;
-          m_op = nullptr;
-          op->complete();
-        }
         return awaitable{*this};
       }
       Task bus_task();

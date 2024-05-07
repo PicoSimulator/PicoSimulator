@@ -13,103 +13,126 @@ void XIP::tick() {
 
 }
 
-// Awaitable<uint8_t> XIP::read_byte(uint32_t addr) 
-// {
-//   switch(addr&0x0f00'0000) {
-//     case 0x0000'0000:
-//     case 0x0100'0000:
-//     case 0x0200'0000:
-//     case 0x0300'0000:
-//       co_return ((uint8_t*)m_flash.begin())[(addr&0x00ff'ffff)];
-//   }
-// }
+#define READ(wordtype, ctype, op)                                                                               \
+{                                                                                                               \
+  uint32_t set, line_no;                                                                                        \
+  uint32_t line_offset;                                                                                         \
+  switch((op.addr&0x0f00'0000)) {                                                                                 \
+    case 0x0000'0000:                                                                                           \
+      /*normal cache operation*/                                                                                \
+      /*check for hit, update cache on miss*/                                                                   \
+      m_acc_counter++;                                                                                          \
+      if (cache_set_lookup(op.addr, set, line_no)) {                                                            \
+        m_hit_counter++;                                                                                        \
+        line_offset = set * 16 + line_no*8;                                                                     \
+      } else {                                                                                                  \
+        cache_set_choose_replacement(set, line_no);                                                             \
+        line_offset = set * 16 + line_no*8;                                                                     \
+        std::copy(&m_flash[(op.addr&0x00ff'fff8)] , &m_flash[(op.addr&0x00ff'fff8) + 8], &m_data[line_offset]); \
+        m_cache_tags[set][line_no] = {true, cache_tag_decode(op.addr)};                                         \
+      }                                                                                                         \
+      op.return_value(*((ctype*)&m_data.data()[(line_offset + (op.addr&0x0000'0007))]));                        \
+      break;                                                                                                    \
+    case 0x0100'0000:                                                                                           \
+      /* check for hit, don't update cache on miss */                                                           \
+      m_acc_counter++;                                                                                          \
+      if (cache_set_lookup(op.addr, set, line_no)) {                                                            \
+        m_hit_counter++;                                                                                        \
+        line_offset = set * 16 + line_no*8;                                                                     \
+        op.return_value(*((ctype*)&m_data.data()[(line_offset + (op.addr&0x0000'0007))]));                      \
+      } else {                                                                                                  \
+        /* don't update cache on miss */                                                                        \
+        op.return_value(*((ctype*)&m_flash.begin()[(op.addr&0x00ff'ffff)]));                                    \
+      }                                                                                                         \
+      break;                                                                                                    \
+    case 0x0200'0000:                                                                                           \
+      /* don't check for hit, always update cache */                                                            \
+      m_acc_counter++;                                                                                          \
+      set = cache_set_decode(op.addr);                                                                          \
+      cache_set_choose_replacement(set, line_no);                                                               \
+      line_offset = set * 16 + line_no*8;                                                                       \
+      std::copy(&m_flash[(op.addr&0x00ff'fff8)] , &m_flash[(op.addr&0x00ff'fff8) + 8], &m_data[line_offset]);   \
+      m_cache_tags[set][line_no] = {true, cache_tag_decode(op.addr)};                                           \
+      [[fallthrough]];                                                                                          \
+    case 0x0300'0000:                                                                                           \
+      /* completely bypass cache */                                                                             \
+      op.return_value(*((ctype*)&m_flash[(op.addr&0x00ff'ffff)]));                                              \
+      break;                                                                                                    \
+     case 0x0400'0000:                                                                                          \
+     {                                                                                                          \
+       switch(op.addr & 0x0000'3fff) {                                                                          \
+         case 0x0000: /* CTRL */                                                                                \
+           op.return_value(0x0000'000b);                                                                        \
+           break;                                                                                               \
+         case 0x0004:  /* FLUSH */                                                                              \
+           op.return_value(0x0000'0000);                                                                        \
+           break;                                                                                               \
+         case 0x0008: /* STAT */                                                                                \
+           op.return_value(0x0000'0003);                                                                        \
+           break;                                                                                               \
+         case 0x000c:                                                                                           \
+           op.return_value(m_hit_counter.get());                                                                \
+           break;                                                                                               \
+         case 0x0010:                                                                                           \
+           op.return_value(m_acc_counter.get());                                                                \
+           break;                                                                                               \
+         case 0x0014: /* STREAM_ADDR */                                                                         \
+           op.return_value(m_stream_addr);                                                                      \
+           break;                                                                                               \
+         case 0x0018: /* STREAM_CTR */                                                                          \
+           op.return_value(m_stream_ctr);                                                                       \
+           break;                                                                                               \
+         case 0x001c: /* STREAM_FIFO */                                                                         \
+           op.return_value(m_stream_fifo.pop());                                                                \
+           break;                                                                                               \
+       }                                                                                                        \
+     } break;                                                                                                   \
+    case 0x0500'0000:                                                                                           \
+      op.return_value(*((ctype*)&m_data[(op.addr&0x0000'3fff)]));                                               \
+      break;                                                                                                    \
+    case 0x0800'0000: /* XIP_SSI_BASE */                                                                        \
+    {                                                                                                           \
+      ctype out;                                                                                                \
+      m_ssi.read_##wordtype(op.addr, out);                                                                      \
+      op.return_value(out);                                                                                     \
+      break;                                                                                                    \
+    }                                                                                                           \
+  }                                                                                                             \
+}                                                                                                               \
 
-// Awaitable<uint16_t> XIP::read_halfword(uint32_t addr) 
-// {
-//   switch(addr&0x0f00'0000) {
-//     case 0x0000'0000:
-//     case 0x0100'0000:
-//     case 0x0200'0000:
-//     case 0x0300'0000:
-//       co_return ((uint16_t*)m_flash.begin())[(addr&0x00ff'ffff)/2];
-//   }
-// }
 
-// Awaitable<uint32_t> XIP::read_word(uint32_t addr) 
-// {
-//   uint32_t set, line_no;
-//   uint32_t line_offset;
-//   switch(addr&0x0f00'0000) {
-//     case 0x0000'0000:
-//       // normal cache operation
-//       // check for hit, update cache on miss
-//       m_acc_counter++;
-//       if (cache_set_lookup(addr, set, line_no)) {
-//         m_hit_counter++;
-//         line_offset = set * 16 + line_no*8;
-//       } else {
-//         cache_set_choose_replacement(set, line_no);
-//         line_offset = set * 16 + line_no*8;
-//         std::copy(&m_flash[(addr&0x00ff'fff8)] , &m_flash[(addr&0x00ff'fff8) + 8], &m_data[line_offset]);
-//         m_cache_tags[set][line_no] = {true, (addr >> 13) & 0x7ff};
-//       }
-//       co_return ((uint32_t*)m_data.data())[(line_offset + (addr&0x0000'0007))/4];
-//     case 0x0100'0000:
-//       // check for hit, don't update cache on miss
-//       m_acc_counter++;
-//       if (cache_set_lookup(addr, set, line_no)) {
-//         m_hit_counter++;
-//         line_offset = set * 16 + line_no*8;
-//         co_return ((uint32_t*)m_data.data())[(line_offset + (addr&0x0000'0007))/4];
-//       } else {
-//         // don't update cache on miss
-//         co_return ((uint32_t*)m_flash.begin())[(addr&0x00ff'ffff)/4];
-//       }
-//     case 0x0200'0000:
-//       // don't check for hit, always update cache
-//       m_acc_counter++;
-//       set = cache_set_decode(addr);
-//       cache_set_choose_replacement(set, line_no);
-//       line_offset = set * 16 + line_no*8;
-//       std::copy(&m_flash[(addr&0x00ff'fff8)] , &m_flash[(addr&0x00ff'fff8) + 8], &m_data[line_offset]);
-//       m_cache_tags[set][line_no] = {true, (addr >> 13) & 0x7ff};
-//     case 0x0300'0000:
-//       // completely bypass cache
-//       co_return ((uint32_t*)m_flash.begin())[(addr&0x00ff'ffff)/4];
-//     case 0x0400'0000:
-//     {
-//       switch(addr & 0x0000'3fff) {
-//         case 0x0000: // CTRL
-//           co_return 0x0000'000b;
-//         case 0x0004: // FLUSH
-//           co_return 0x0000'0000;
-//         case 0x0008: // STAT
-//           co_return 0x0000'0003;
-//         case 0x000c:
-//           // co_return 0;
-//           co_return m_hit_counter.get();
-//         case 0x0010:
-//           // co_return 0;
-//           co_return m_acc_counter.get();
-//         case 0x0014: // STREAM_ADDR
-//           co_return m_stream_addr;
-//         case 0x0018: // STREAM_CTR
-//           co_return m_stream_ctr;
-//         case 0x001c: // STREAM_FIFO
-//           co_return m_stream_fifo.pop();
-//       }
-//     }
-//     case 0x0500'0000:
-//       co_return ((uint32_t*)m_data.data())[(addr&0x0000'3fff) >> 2];
-//     case 0x0800'0000: // XIP_SSI_BASE
-//     {
-//       uint32_t out;
-//       m_ssi.read_word(addr, out);
-//       co_return out;
-//     }
-//   }
-//   throw ARMv6M::UnimplementedFault{"XIP::read_word"};
-// }
+Task XIP::bus_task(){
+  while(true) {
+    auto &op = co_await next_op();
+    // std::cout << "got op" << std::endl;
+    switch (op.optype) {
+      case MemoryOperation::READ_BYTE:
+        READ(byte, uint8_t, op);
+        break;
+      case MemoryOperation::READ_HALFWORD:
+        READ(halfword, uint16_t, op);
+        break;
+      case MemoryOperation::READ_WORD:
+        READ(word, uint32_t, op);
+        break;
+      case MemoryOperation::WRITE_BYTE:
+        // m_flash[op.addr] = op.data;
+        op.return_void();
+        break;
+      case MemoryOperation::WRITE_HALFWORD:
+        // *(uint16_t*)&m_flash[op.addr] = op.data;
+        op.return_void();
+        break;
+      case MemoryOperation::WRITE_WORD:
+        // *(uint32_t*)&m_flash[op.addr] = op.data;
+        if ((op.addr & 0x0f00'0000) ==  0x0800'0000) {
+          m_ssi.write_word(op.addr, op.data);
+        }
+        op.return_void();
+        break;
+    }
+  }
+}
 
 // Awaitable<void> XIP::write_byte(uint32_t addr, uint8_t in) 
 // {

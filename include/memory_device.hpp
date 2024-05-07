@@ -146,6 +146,18 @@ private:
 
 };
 
+class ISingleAsyncReadWritePort : public IAsyncReadWritePort<uint32_t>{
+public:
+protected:
+private:
+};
+template<int N>
+class IMultiAsyncReadWritePort : public IAsyncReadWritePort<uint32_t>{
+public:
+protected:
+private:
+};
+
 inline void MemoryOperation::return_void() {
   assert(is_write());
   // DO NOT ENABLE THESE PRINTS THEY ADD 200MB TO THE LOGS PER MCYCLES
