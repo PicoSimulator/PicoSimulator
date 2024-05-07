@@ -1361,6 +1361,33 @@
         /*throw HardFault{"BKPT not implemented"};*/\
       }\
     })\
+    do_exec({\
+      if (opcode & (1<<24)){\
+        /*being lazy not checking for opb==0*/\
+        uint32_t opa = (opcode >> 20) & 0xf;\
+        switch(opa) {\
+          case 0b0000: /*NOP*/ \
+            break;\
+          case 0b0001: /*YIELD*/ \
+            break;\
+          case 0b0010: /*WFE*/ \
+            while (!EventRegistered()) co_await next_tick();\
+            ClearEventRegister();\
+            break;\
+          case 0b0011: /*WFI*/ \
+            while (!EventRegistered()) co_await next_tick();\
+            ClearEventRegister();\
+            break;\
+          case 0b0100: /*SEV*/ \
+            break;\
+          default: throw HardFault{"Undefined opcode"};\
+        }\
+      } else {\
+        /*BKPT*/\
+        uint32_t imm8 = (opcode >> 16) & 0xFF; \
+        /*throw HardFault{"BKPT not implemented"};*/\
+      }\
+    })\
   }
 
 #define OPCODE_1100_0xx_stm(opcode, do_disasm, do_exec, do_trace, core) \
