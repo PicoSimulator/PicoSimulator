@@ -15,11 +15,12 @@ namespace ARMv6M{
 
   class ARMv6MCore final : public IClockable, public IResettable{
   public:
-    ARMv6MCore(IAsyncReadWritePort<uint32_t> &bus, std::string name) 
+    ARMv6MCore(IAsyncReadWritePort<uint32_t> &bus, std::string name, ARMv6MCore &other_core) 
     : m_mpu_bus_interface{bus, *this}
     , m_ppb{*this}
     , m_core_task{core_task()}
     , m_name{std::move(name)}
+    , m_other_core{other_core}
     {
 
     }
@@ -70,8 +71,10 @@ namespace ARMv6M{
     void BranchWritePC(uint32_t target) { BranchTo(target&~1); }
     void ALUWritePC(uint32_t target) { BranchWritePC(target); }
     void LoadWritePC(uint32_t target) { BXWritePC(target); }
-    bool EventRegistered()  const { return false; }
-    void ClearEventRegister() {}
+    bool m_event;
+    bool EventRegistered()  const { return m_event; }
+    void ClearEventRegister() { m_event = false; }
+    void SendEvent() { m_other_core.m_event = true; }
 
     // enum ProcessorMode{
     //   ThreadMode = 0b10000,
@@ -101,7 +104,6 @@ namespace ARMv6M{
       NEGATIVE = 1<<31,
     };
     bool m_threadMode;
-    IAsyncReadWritePort<uint32_t> &m_bus_interface = m_mpu_bus_interface;
 
     enum Cond{
       EQ = 0b0000,
@@ -213,7 +215,9 @@ namespace ARMv6M{
 
     MPU m_mpu_bus_interface;
     PPB m_ppb;
+    IAsyncReadWritePort<uint32_t> &m_bus_interface = m_mpu_bus_interface;
     const std::string m_name;
+    ARMv6MCore &m_other_core;
   };
 
 

@@ -17,7 +17,7 @@ RP2040::RP2040::RP2040()
 , m_apb{m_resets, m_vreg, m_clocks, m_syscfg}
 , m_ahb{*this}
 , m_core_bus{{m_ioports[0], m_ahb}, {m_ioports[1], m_ahb}}
-, m_cores{{m_core_bus[0], "core-0"}, {m_core_bus[1], "core-1"}}
+, m_cores{{m_core_bus[0], "core-0", m_cores[1]}, {m_core_bus[1], "core-1", m_cores[0]}}
 {
   clk_sys.sink_add(m_cores[0]);
   clk_sys.sink_add(m_cores[1]);

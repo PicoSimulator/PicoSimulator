@@ -762,7 +762,7 @@
     })\
     do_exec({\
       uint32_t addr = (PC() & ~3) + imm32 + 4; \
-      uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
+      uint32_t data = co_await m_bus_interface.read_word(addr); \
       set_reg(Rt, data); \
       do_trace({\
           std::cout << FMT_reg(Rt) << ":=MemU[" << FMT_hexw(addr, 8) << ",4]=" \
@@ -786,7 +786,7 @@
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_word(addr, data); \
+      co_await m_bus_interface.write_word(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",4]:=" << data \
                   << std::endl;\
@@ -805,7 +805,7 @@
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_halfword(addr, data); \
+      co_await m_bus_interface.write_halfword(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",2]:=" << (data&0xffff) \
                   << std::endl;\
@@ -824,7 +824,7 @@
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_byte(addr, data); \
+      co_await m_bus_interface.write_byte(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",1]:=0x" << std::hex << (data&0xff) \
                   << std::endl;\
@@ -842,7 +842,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
-      uint32_t data = co_await m_mpu_bus_interface.read_byte(addr); \
+      uint32_t data = co_await m_bus_interface.read_byte(addr); \
       data = SignExtend(data, 8);\
       set_reg(Rt, data);\
       do_trace({\
@@ -862,7 +862,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
-      uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
+      uint32_t data = co_await m_bus_interface.read_word(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",4]=0x" << std::hex << (data) \
@@ -881,7 +881,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
-      uint32_t data = co_await m_mpu_bus_interface.read_halfword(addr); \
+      uint32_t data = co_await m_bus_interface.read_halfword(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",2]=0x" << std::hex << (data) \
@@ -900,7 +900,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
-      uint32_t data = co_await m_mpu_bus_interface.read_byte(addr); \
+      uint32_t data = co_await m_bus_interface.read_byte(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",1]=0x" << std::hex << (data) \
@@ -919,7 +919,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + get_reg(Rm); \
-      uint32_t data = co_await m_mpu_bus_interface.read_halfword(addr); \
+      uint32_t data = co_await m_bus_interface.read_halfword(addr); \
       data = SignExtend(data, 16);\
       set_reg(Rt, data); \
       do_trace({\
@@ -940,7 +940,7 @@
     do_exec({\
       uint32_t addr = get_reg(Rn) + imm32; \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_word(addr, data); \
+      co_await m_bus_interface.write_word(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",4]:=" << data \
                   << std::endl;\
@@ -958,7 +958,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + imm32; \
-      uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
+      uint32_t data = co_await m_bus_interface.read_word(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",4]=0x" << FMT_hexw(data, 8) \
@@ -978,7 +978,7 @@
     do_exec({\
       uint32_t addr = get_reg(Rn) + imm5; \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_byte(addr, data); \
+      co_await m_bus_interface.write_byte(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",1]:=" << data \
                   << std::endl;\
@@ -996,7 +996,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + imm32; \
-      uint32_t data = co_await m_mpu_bus_interface.read_byte(addr); \
+      uint32_t data = co_await m_bus_interface.read_byte(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",1]=0x" << FMT_hexw(data, 2) \
@@ -1016,7 +1016,7 @@
     do_exec({\
       uint32_t addr = get_reg(Rn) + imm32; \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_halfword(addr, data); \
+      co_await m_bus_interface.write_halfword(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",2]:=0x" << FMT_hexw(data, 4) \
                   << std::endl;\
@@ -1034,7 +1034,7 @@
     })\
     do_exec({\
       uint32_t addr = get_reg(Rn) + imm32; \
-      uint32_t data = co_await m_mpu_bus_interface.read_halfword(addr); \
+      uint32_t data = co_await m_bus_interface.read_halfword(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",2]=0x" << FMT_hexw(data, 4) \
@@ -1053,7 +1053,7 @@
     do_exec({\
       uint32_t addr = SP() + imm32; \
       uint32_t data = get_reg(Rt); \
-      co_await m_mpu_bus_interface.write_word(addr, data); \
+      co_await m_bus_interface.write_word(addr, data); \
       do_trace({\
         std::cout << "MemU[" << std::hex << addr << ",4]:=" << data \
                   << std::endl;\
@@ -1070,7 +1070,7 @@
     })\
     do_exec({\
       uint32_t addr = SP() + imm32; \
-      uint32_t data = co_await m_mpu_bus_interface.read_word(addr); \
+      uint32_t data = co_await m_bus_interface.read_word(addr); \
       set_reg(Rt, data); \
       do_trace({\
         std::cout << FMT_reg(Rt) << ":=MemU[" << std::hex << addr << ",4]=0x" << FMT_hexw(data, 8) \
@@ -1234,7 +1234,7 @@
         if ((regs_list & (1<<i)) == 0) continue; \
         uint32_t val = get_reg(i);\
         addr -= 4;\
-        co_await m_mpu_bus_interface.write_word(addr, val);\
+        co_await m_bus_interface.write_word(addr, val);\
         do_trace({\
           std::cout << "MemU[" << FMT_hexw(addr, 8) << ",4]:=" << FMT_hexw(val, 8) << std::endl;\
         })\
@@ -1307,7 +1307,7 @@
       uint32_t addr = SP();\
       for (int i = 0; i <= 7; i++) {\
         if ((regs_list & (1<<i)) == 0) continue; \
-        uint32_t val= co_await m_mpu_bus_interface.read_word(addr); \
+        uint32_t val= co_await m_bus_interface.read_word(addr); \
         set_reg(i, val);\
         do_trace({\
           std::cout << FMT_reg(i) << ":=MemU[" << FMT_hexw(addr, 8) << ",4]=0x" << FMT_hexw(val, 8) << std::endl;\
@@ -1315,7 +1315,7 @@
         addr += 4;\
       }\
       if (regs_list & (1<<15)) {\
-        uint32_t val = co_await m_mpu_bus_interface.read_word(addr);\
+        uint32_t val = co_await m_bus_interface.read_word(addr);\
         LoadWritePC(val);\
         do_trace({\
           std::cout << "PC:=MemU[" << FMT_hexw(addr, 8) << ",4]=0x" << FMT_hexw(val, 8) << std::endl;\
@@ -1379,6 +1379,7 @@
             ClearEventRegister();\
             break;\
           case 0b0100: /*SEV*/ \
+            SendEvent();\
             break;\
           default: throw HardFault{"Undefined opcode"};\
         }\
@@ -1403,7 +1404,7 @@
       for (int i = 0; i < 8; i++) {\
         if ((reg_list & (1<<i)) == 0) continue;\
         uint32_t val = get_reg(i); \
-        co_await m_mpu_bus_interface.write_word(Rn_val, val);\
+        co_await m_bus_interface.write_word(Rn_val, val);\
         do_trace({\
           std::cout << "MemU[" << FMT_hexw(Rn_val, 8) << ",4]:=0x" << FMT_hexw(val, 8) << std::endl;\
         })\
@@ -1430,7 +1431,7 @@
       uint32_t Rn_val = get_reg(Rn);\
       for (int i = 0; i < 8; i++) {\
         if ((reg_list & (1<<i)) == 0) continue;\
-        uint32_t val = co_await m_mpu_bus_interface.read_word(Rn_val);\
+        uint32_t val = co_await m_bus_interface.read_word(Rn_val);\
         set_reg(i, val);\
         do_trace({\
           std::cout << FMT_reg(i) << ":=MemU[" << FMT_hexw(Rn_val, 8) << ",4]=0x" << FMT_hexw(val, 8) << std::endl;\
