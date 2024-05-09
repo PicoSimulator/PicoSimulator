@@ -14,15 +14,17 @@ RP2040::RP2040::RP2040()
 , m_ioports{{0, m_fifo_01, m_fifo_10}, {1, m_fifo_10, m_fifo_01}}
 , m_ROM{load_bootloader(BootloaderVersion::B2)}
 , m_bus_masters{m_cores[0].run(), m_cores[1].run()}
-, m_apb{m_resets, m_vreg, m_clocks, m_syscfg}
+, m_ahb_lite{m_DMA}
 , m_ahb{*this}
+, m_DMA{m_ahb}
+, m_apb{m_resets, m_vreg, m_clocks, m_syscfg, m_DMA.dreq_uart0_tx(), m_DMA.dreq_uart0_rx(), m_DMA.dreq_uart1_tx(), m_DMA.dreq_uart1_rx()}
 , m_core_bus{{m_ioports[0], m_ahb}, {m_ioports[1], m_ahb}}
 , m_cores{{m_core_bus[0], "core-0", m_cores[1]}, {m_core_bus[1], "core-1", m_cores[0]}}
 {
   clk_sys.sink_add(m_cores[0]);
   clk_sys.sink_add(m_cores[1]);
+  clk_sys.sink_add(m_DMA);
   clk_sys.sink_add(m_ahb);
-  // clk_sys.sink_add(m_dma);
   clk_sys.sink_add(m_XIP);
   clk_sys.sink_add(m_SSI);
   clk_ref.sink_add(m_apb.timer());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "rp2040/peripheral.hpp"
+#include "rp2040/peri/dma/dreq.hpp"
 #include "clock.hpp"
 #include "fifo.hpp"
 
@@ -10,6 +11,17 @@
 
 class UART final : public IPeripheralPort, public IClockable{
 public:
+  UART(RP2040::DMA::DReq &tx_dreq, RP2040::DMA::DReq &rx_dreq)
+  : m_tx_dreq(tx_dreq), m_rx_dreq(rx_dreq)
+  {
+    m_idiv = 0;
+    m_fdiv = 0;
+    m_control = 0;
+    m_lcr_h = 0;
+    m_lcr_l = 0;
+    m_shift_in_counter = 0;
+    m_shift_out_counter = 0;
+  }
   void tick() override final
   {
     if ((m_control & Control::UART_EN) == 0) return;
@@ -172,5 +184,8 @@ private:
 
   uint32_t m_shift_in_counter;
   uint32_t m_shift_out_counter;
+
+  RP2040::DMA::DReq &m_tx_dreq;
+  RP2040::DMA::DReq &m_rx_dreq;
 
 };

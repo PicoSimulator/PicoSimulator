@@ -99,8 +99,8 @@ BusMaster ARMv6MCore::core_task()
         m_nextPC = PC() + instr_incr;
         
         #define DO(x) {x}
-        #define DO_DISAS(x) {std::cout << "D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
-        #define DO_TRACE(x) {std::cout << "T:";  {x}}
+        #define DO_DISAS(x) {std::cout << m_name << ":D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
+        #define DO_TRACE(x) {std::cout << m_name << ":T:";  {x}}
         #define DO2(x, y) {x}{y}
         #define DONT(x) 
 

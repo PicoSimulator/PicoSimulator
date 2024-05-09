@@ -1,6 +1,7 @@
 #pragma once
 
 #include "async.hpp"
+#include "memory_device.hpp"
 #include <coroutine>
 #include <vector>
 #include <algorithm>

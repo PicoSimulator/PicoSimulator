@@ -3,6 +3,7 @@
 #include <coroutine>
 #include <utility>
 #include <iostream>
+#include "clock.hpp"
 
 // co_return void
 class Task;
@@ -32,6 +33,39 @@ public:
     };
     Handle m_handle;
 };
+
+class ClockTask final : public IClockable {
+public:
+  struct promise_type;
+  using Handle = std::coroutine_handle<promise_type>;
+  ClockTask(Handle handle) : m_handle{handle} {}
+  std::coroutine_handle<> get_handle() const { return m_handle; }
+  struct promise_type {
+    ClockTask get_return_object() { return ClockTask{Handle::from_promise(*this)}; }
+    std::suspend_never initial_suspend() noexcept { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    void return_void() {}
+    void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
+    bool m_waiting_on_tick;
+  };
+  void tick() override final {
+    if (m_handle.promise().m_waiting_on_tick)
+      m_handle.resume();
+  }
+  static auto next_tick() {
+    struct awaiter{
+      bool await_ready() const noexcept { return false; }
+      void await_suspend(std::coroutine_handle<promise_type> h) const noexcept {
+        h.promise().m_waiting_on_tick = true;
+      }
+      void await_resume() const noexcept {}
+    };
+    return awaiter{};
+  }
+private:
+  Handle m_handle;
+};
+
 
 // template<class T>
 // class Generator {

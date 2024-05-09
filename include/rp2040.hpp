@@ -16,6 +16,7 @@ namespace RP2040 {
 #include "rp2040/pad.hpp"
 #include "rp2040/bus/apb.hpp"
 #include "rp2040/bus/ahb.hpp"
+#include "rp2040/bus/ahb_lite.hpp"
 #include "rp2040/core/fifo.hpp"
 #include "rp2040/core/divider.hpp"
 #include "rp2040/core/spinlock.hpp"
@@ -24,6 +25,7 @@ namespace RP2040 {
 #include "rp2040/peri/clocks.hpp"
 #include "rp2040/peri/xip.hpp"
 #include "rp2040/peri/ssi.hpp"
+#include "rp2040/peri/dma/dma.hpp"
 #include <coroutine>
 
 namespace RP2040{
@@ -37,6 +39,7 @@ namespace RP2040{
     UART &UART0();
     Bus::APB &APB() { return m_apb; }
     ::RP2040::XIP &XIP() { return m_XIP; }
+    Bus::AHBLite &AHBLite() { return m_ahb_lite; }
 
     auto &ROM() { return m_ROM; }
     auto &SRAM0() { return m_SRAM0; }
@@ -169,7 +172,9 @@ namespace RP2040{
     Core::FiFo m_fifo_01, m_fifo_10;
     IOPort m_ioports[2];
     BusMaster *m_bus_masters[2];
+    Bus::AHBLite m_ahb_lite;
     Bus::AHB m_ahb;
+    DMA::DMA m_DMA;
     Bus::APB m_apb;
     CoreBus m_core_bus[2];
     ARMv6M::ARMv6MCore m_cores[2];

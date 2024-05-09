@@ -17,6 +17,8 @@ public:
     m_count--;
     return t;
   }
+  T &peek() { return m_data[m_head]; }
+  const T &peek() const { return m_data[m_head]; }
   size_t count() const { return m_count; }
   bool empty() const { return m_count == 0; }
   bool full() const { return m_count == N; }

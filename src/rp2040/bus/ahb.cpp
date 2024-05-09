@@ -83,6 +83,7 @@ Task AHB::bus_task(uint32_t id)
             case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_halfword(m_rp2040.SRAM5(), offset); break;
             case BusDevice::APB: out = co_await m_rp2040.APB().read_halfword(op.addr); break;
             case BusDevice::XIP: out = co_await m_rp2040.XIP().read_halfword(op.addr); break;
+            case BusDevice::AHBLITE: m_rp2040.AHBLite().read_halfword(op.addr, out); break;
             default: throw ARMv6M::BusFault{op.addr};
           }
           // std::cout << "read_halfword(" << std::hex << addr << std::dec << ") completed" << std::endl;
@@ -100,6 +101,7 @@ Task AHB::bus_task(uint32_t id)
           case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_word(m_rp2040.SRAM5(), offset); break;
           case BusDevice::APB: out = co_await m_rp2040.APB().read_word(op.addr); break;
           case BusDevice::XIP: out = co_await m_rp2040.XIP().read_word(op.addr); break;
+          case BusDevice::AHBLITE: m_rp2040.AHBLite().read_word(op.addr, out); break;
           default: throw ARMv6M::BusFault{op.addr};
         }        
         op.return_value(out);
@@ -175,6 +177,7 @@ Awaitable<uint8_t> AHB::read_byte_internal(uint32_t addr)
     case BusDevice::SRAM5: out = /* [2048] */byte_array_read_as_byte(m_rp2040.SRAM5(), offset); break;
     case BusDevice::APB: out = co_await m_rp2040.APB().read_byte(addr); break;
     case BusDevice::XIP: out = co_await m_rp2040.XIP().read_byte(addr); break;
+    case BusDevice::AHBLITE: m_rp2040.AHBLite().read_byte(addr, out); break;
     default: throw ARMv6M::BusFault{addr};
   }
   // std::cout << "read_byte(" << std::hex << addr << std::dec << ") completed " << uint{out} << std::endl;
@@ -196,6 +199,7 @@ Awaitable<uint16_t> AHB::read_halfword_internal(uint32_t addr)
     case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_halfword(m_rp2040.SRAM5(), offset); break;
     case BusDevice::APB: out = co_await m_rp2040.APB().read_halfword(addr); break;
     case BusDevice::XIP: out = co_await m_rp2040.XIP().read_halfword(addr); break;
+    case BusDevice::AHBLITE: m_rp2040.AHBLite().read_halfword(addr, out); break;
     default: throw ARMv6M::BusFault{addr};
   }
   // std::cout << "read_halfword(" << std::hex << addr << std::dec << ") completed" << std::endl;
@@ -217,6 +221,7 @@ Awaitable<uint32_t> AHB::read_word_internal(uint32_t addr)
     case BusDevice::SRAM5: out = /* [2048] */ byte_array_read_as_word(m_rp2040.SRAM5(), offset); break;
     case BusDevice::APB: out = co_await m_rp2040.APB().read_word(addr); break;
     case BusDevice::XIP: out = co_await m_rp2040.XIP().read_word(addr); break;
+    case BusDevice::AHBLITE: m_rp2040.AHBLite().read_word(addr, out); break;
     default: throw ARMv6M::BusFault{addr};
   }
   // std::cout << "read_word(" << std::hex << addr << std::dec << ") completed " << out << std::endl;
@@ -238,6 +243,8 @@ Awaitable<void> AHB::write_byte_internal(uint32_t addr, uint8_t val)
     case BusDevice::SRAM4: /* [2048] */ byte_array_write_as_byte(m_rp2040.SRAM4(), offset, val); break;
     case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_byte(m_rp2040.SRAM5(), offset, val); break;
     case BusDevice::APB: co_await m_rp2040.APB().write_byte(addr, val); break;
+    case BusDevice::XIP: co_await m_rp2040.XIP().write_byte(addr, val); break;
+    case BusDevice::AHBLITE: m_rp2040.AHBLite().write_byte(addr, val); break;
     default: throw ARMv6M::BusFault{addr};
   }
 }
@@ -256,6 +263,8 @@ Awaitable<void> AHB::write_halfword_internal(uint32_t addr, uint16_t val)
     case BusDevice::SRAM4: /* [2048] */ byte_array_write_as_halfword(m_rp2040.SRAM4(), offset, val); break;
     case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_halfword(m_rp2040.SRAM5(), offset, val); break;
     case BusDevice::APB: co_await m_rp2040.APB().write_halfword(addr, val); break;
+    case BusDevice::XIP: co_await m_rp2040.XIP().write_halfword(addr, val); break;
+    case BusDevice::AHBLITE: m_rp2040.AHBLite().write_halfword(addr, val); break;
     default: throw ARMv6M::BusFault{addr};
   }
 }
@@ -277,6 +286,7 @@ Awaitable<void> AHB::write_word_internal(uint32_t addr, uint32_t val)
     case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_word(m_rp2040.SRAM5(), offset, val); break;
     case BusDevice::APB: co_await m_rp2040.APB().write_word(addr, val); break;
     case BusDevice::XIP: co_await m_rp2040.XIP().write_word(addr, val); break;
+    case BusDevice::AHBLITE: m_rp2040.AHBLite().write_word(addr, val); break;
     default: throw ARMv6M::BusFault{addr};
   }
   // std::cout << "write_word(" << std::hex << addr << std::dec << ") completed" << std::endl;

@@ -15,6 +15,7 @@
 #include "rp2040/peri/timer.hpp"
 #include "rp2040/peri/pll.hpp"
 #include "rp2040/peri/uart.hpp"
+#include "rp2040/peri/dma/dreq.hpp"
 #include "async.hpp"
 
 #include <cassert>
@@ -28,13 +29,19 @@ namespace RP2040::Bus{
       Resets &resets,
       VReg &vreg,
       Clocks &clocks,
-      SysCfg &syscfg
+      SysCfg &syscfg,
+      DMA::DReq &uart0_tx_dreq,
+      DMA::DReq &uart0_rx_dreq,
+      DMA::DReq &uart1_tx_dreq,
+      DMA::DReq &uart1_rx_dreq
     ) 
     : m_runner{bus_task().get_handle()}
     , m_resets{resets}
     , m_vreg{vreg}
     , m_clocks{clocks}
     , m_syscfg{syscfg}
+    , m_uart0{uart0_tx_dreq, uart0_rx_dreq}
+    , m_uart1{uart1_tx_dreq, uart1_rx_dreq}
     {}
     virtual void tick() override;
     Awaitable<uint8_t> read_byte_internal(uint32_t addr);
