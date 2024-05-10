@@ -26,6 +26,7 @@ namespace RP2040 {
 #include "rp2040/peri/xip.hpp"
 #include "rp2040/peri/ssi.hpp"
 #include "rp2040/peri/dma/dma.hpp"
+#include "rp2040/peri/dma/dreq.hpp"
 #include <coroutine>
 
 namespace RP2040{
@@ -85,6 +86,7 @@ namespace RP2040{
     std::array<uint8_t, 65536> m_SRAM3;
     std::array<uint8_t, 4096> m_SRAM4;
     std::array<uint8_t, 4096> m_SRAM5;
+    DMA::NullDReqSource m_null_dreq;
 
 
     class CoreBus final : public IAsyncReadWritePort<uint32_t>{

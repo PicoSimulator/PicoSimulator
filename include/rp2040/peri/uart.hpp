@@ -11,8 +11,7 @@
 
 class UART final : public IPeripheralPort, public IClockable{
 public:
-  UART(RP2040::DMA::DReq &tx_dreq, RP2040::DMA::DReq &rx_dreq)
-  : m_tx_dreq(tx_dreq), m_rx_dreq(rx_dreq)
+  UART()
   {
     m_idiv = 0;
     m_fdiv = 0;
@@ -38,6 +37,8 @@ public:
     if (m_file.badbit)
       std::cout << "Failed to open file" << std::endl;
   }
+  RP2040::DMA::DReqSource &tx_dreq() { return m_tx_fifo.dreq(); }
+  RP2040::DMA::DReqSource &rx_dreq() { return m_rx_fifo.dreq(); }
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
@@ -71,6 +72,9 @@ protected:
       case UARTDR:
         if (!m_tx_fifo.full()) {
           m_tx_fifo.push(in);
+          std::cout << "UART DR: (" << char(in) << ")" << std::endl;
+        } else {
+          std::cout << "UART TX FIFO OVERFLOW!" << std::endl;
         }
         break;
       case UARTIBRD: m_ibrd = in & 0x3fff; break;
@@ -142,6 +146,7 @@ private:
       char c = m_tx_fifo.pop();
       if (m_file.is_open()) {
         m_file.write(&c, 1);
+        m_file.flush();
       }
     } else if (m_shift_out_counter > 0) {
       m_shift_out_counter--;
@@ -166,8 +171,8 @@ private:
     return (m_lcr_h >> 5) & 3;
   }
 
-  FiFo<uint32_t, 32> m_tx_fifo;
-  FiFo<uint32_t, 32> m_rx_fifo;
+  DReqFiFo<uint32_t, 32> m_tx_fifo;
+  DReqFiFo<uint32_t, 32> m_rx_fifo;
 
   uint32_t m_status;
   uint32_t m_ibrd;
@@ -184,8 +189,5 @@ private:
 
   uint32_t m_shift_in_counter;
   uint32_t m_shift_out_counter;
-
-  RP2040::DMA::DReq &m_tx_dreq;
-  RP2040::DMA::DReq &m_rx_dreq;
 
 };

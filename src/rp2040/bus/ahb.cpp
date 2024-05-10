@@ -22,11 +22,13 @@ void AHB::tick()
     if (q.empty() || busy)
       continue;
     auto h = q.front();
+    // std::cout << "Mem Op Starting AHB: " << std::dec << i << std::endl;
     busy = true;
     q.pop();
     for(int i = 0; i < 4; i++) {
       if (m_ops[i] != nullptr) continue;
       m_ops[i] = &(h.get());
+
       m_runners[i].resume();
       break;
     }
@@ -67,6 +69,7 @@ Task AHB::bus_task(uint32_t id)
     auto val = lookupBusDeviceAddress(op.addr);
     auto dev = std::get<0>(val);
     auto offset = std::get<1>(val);
+    // std::cout << dev << "," << offset << std::endl;
     switch(op.optype) {
       case MemoryOperation::OpType::READ_BYTE: 
         op.return_value(co_await read_byte_internal(op.addr));
@@ -230,6 +233,7 @@ Awaitable<uint32_t> AHB::read_word_internal(uint32_t addr)
 
 Awaitable<void> AHB::write_byte_internal(uint32_t addr, uint8_t val)
 {
+  // std::cout << "AHB::write_byte_internal(" << std::hex << addr << std::dec << ")" << std::endl;
   auto devoffset = lookupBusDeviceAddress(addr);
   auto dev = std::get<0>(devoffset);
   auto offset = std::get<1>(devoffset);
@@ -247,6 +251,7 @@ Awaitable<void> AHB::write_byte_internal(uint32_t addr, uint8_t val)
     case BusDevice::AHBLITE: m_rp2040.AHBLite().write_byte(addr, val); break;
     default: throw ARMv6M::BusFault{addr};
   }
+  co_return;
 }
 Awaitable<void> AHB::write_halfword_internal(uint32_t addr, uint16_t val)
 {

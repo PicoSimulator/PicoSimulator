@@ -91,11 +91,11 @@ Awaitable<uint32_t> APB::read_word_internal(uint32_t addr)
 }
 Awaitable<void> APB::write_byte_internal(uint32_t addr, uint8_t in)
 {
-  co_await write_word(addr, in | (in << 8) | (in << 16) | (in << 24));
+  co_await write_word_internal(addr, in | (in << 8) | (in << 16) | (in << 24));
 }
 Awaitable<void> APB::write_halfword_internal(uint32_t addr, uint16_t in)
 {
-  co_await write_word(addr, in | (in << 16));
+  co_await write_word_internal(addr, in | (in << 16));
 }
 Awaitable<void> APB::write_word_internal(uint32_t addr, uint32_t in)
 {

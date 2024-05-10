@@ -16,8 +16,50 @@ RP2040::RP2040::RP2040()
 , m_bus_masters{m_cores[0].run(), m_cores[1].run()}
 , m_ahb_lite{m_DMA}
 , m_ahb{*this}
-, m_DMA{m_ahb}
-, m_apb{m_resets, m_vreg, m_clocks, m_syscfg, m_DMA.dreq_uart0_tx(), m_DMA.dreq_uart0_rx(), m_DMA.dreq_uart1_tx(), m_DMA.dreq_uart1_rx()}
+, m_DMA{m_ahb, {
+  /*DREQ_PIO0_TX0*/ m_null_dreq,
+  /*DREQ_PIO0_TX1*/ m_null_dreq,
+  /*DREQ_PIO0_TX2*/ m_null_dreq,
+  /*DREQ_PIO0_TX3*/ m_null_dreq,
+  /*DREQ_PIO0_RX0*/ m_null_dreq,
+  /*DREQ_PIO0_RX1*/ m_null_dreq,
+  /*DREQ_PIO0_RX2*/ m_null_dreq,
+  /*DREQ_PIO0_RX3*/ m_null_dreq,
+  /*DREQ_PIO1_TX0*/ m_null_dreq,
+  /*DREQ_PIO1_TX1*/ m_null_dreq,
+  /*DREQ_PIO1_TX2*/ m_null_dreq,
+  /*DREQ_PIO1_TX3*/ m_null_dreq,
+  /*DREQ_PIO1_RX0*/ m_null_dreq,
+  /*DREQ_PIO1_RX1*/ m_null_dreq,
+  /*DREQ_PIO1_RX2*/ m_null_dreq,
+  /*DREQ_PIO1_RX3*/ m_null_dreq,
+  /*DREQ_SPI0_TX*/ m_null_dreq,
+  /*DREQ_SPI0_RX*/ m_null_dreq,
+  /*DREQ_SPI1_TX*/ m_null_dreq,
+  /*DREQ_SPI1_RX*/ m_null_dreq,
+  /*DREQ_UART0_TX*/ UART0().tx_dreq(),
+  /*DREQ_UART0_RX*/ UART0().rx_dreq(),
+  /*DREQ_UART1_TX*/ m_null_dreq,
+  /*DREQ_UART1_RX*/ m_null_dreq,
+  /*DREQ_PWM_WRAP0*/ m_null_dreq,
+  /*DREQ_PWM_WRAP1*/ m_null_dreq,
+  /*DREQ_PWM_WRAP2*/ m_null_dreq,
+  /*DREQ_PWM_WRAP3*/ m_null_dreq,
+  /*DREQ_PWM_WRAP4*/ m_null_dreq,
+  /*DREQ_PWM_WRAP5*/ m_null_dreq,
+  /*DREQ_PWM_WRAP6*/ m_null_dreq,
+  /*DREQ_PWM_WRAP7*/ m_null_dreq,
+  /*DREQ_I2C0_TX*/ m_null_dreq,
+  /*DREQ_I2C0_RX*/ m_null_dreq,
+  /*DREQ_I2C1_TX*/ m_null_dreq,
+  /*DREQ_I2C1_RX*/ m_null_dreq,
+  /*DREQ_ADC*/ m_null_dreq,
+  /*DREQ_XIP_STREAM*/ m_null_dreq,
+  /*DREQ_XIP_SSITX*/ m_null_dreq,
+  /*DREQ_XIP_SSIRX*/ m_null_dreq,
+
+}}
+, m_apb{m_resets, m_vreg, m_clocks, m_syscfg}
 , m_core_bus{{m_ioports[0], m_ahb}, {m_ioports[1], m_ahb}}
 , m_cores{{m_core_bus[0], "core-0", m_cores[1]}, {m_core_bus[1], "core-1", m_cores[0]}}
 {

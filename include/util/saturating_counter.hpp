@@ -9,14 +9,18 @@ public:
   operator T() const { return m_counter; }
   void set(T t) { m_counter = t; }
   void reset() { set(0); }
-  T operator++() { T v = m_counter; increment(); return v; }
-  T operator++(int) { increment(); return m_counter; }
-  T operator--() { T v = m_counter; decrement(); return v; }
-  T operator--(int) { decrement(); return m_counter; }
-  T operator=(T t) { m_counter = t; return m_counter; }
+  T operator++() { T v = *this; increment(); return v; }
+  T operator++(int) { increment(); return *this; }
+  T operator+=(T v) { add(v); return *this; }
+  T operator--() { T v = *this; decrement(); return v; }
+  T operator--(int) { decrement(); return *this; }
+  T operator-=(T v) { sub(v); return *this; }
+  T operator=(T t) { m_counter = t; return *this; }
 protected:
 private:
   void decrement() { if ((m_counter - increment_value) >= min && (m_counter > (m_counter - increment_value))) m_counter -= increment_value; }
+  void add(T v) { if ((max - v) < m_counter) m_counter = max; else m_counter += v; }
   void increment() { if ((m_counter + increment_value) <= max && (m_counter < (m_counter + increment_value))) m_counter += increment_value; }
+  void sub(T v) { if ((min + v) > m_counter) m_counter = min; else m_counter -= v;}
   T m_counter;
 };

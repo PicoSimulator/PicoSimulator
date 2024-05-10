@@ -6,6 +6,7 @@
 #include "fifo.hpp"
 #include "rp2040/peripheral.hpp"
 #include "rp2040/bus/ahb.hpp"
+#include "reset.hpp"
 
 #include "dreq.hpp"
 #include "treq.hpp"
@@ -64,34 +65,10 @@ namespace RP2040::DMA{
   class DMA;
   class Channel final : public IClockable{
   public:
-    Channel(DMA &dma, uint32_t id)
-    : m_dma{dma}
-    , m_dreq{nullptr}
-    , m_own_dreq{}
-    , m_treq{nullptr}
-    , m_enabled{false}
-    , m_read_addr{0}
-    , m_read_increment{0}
-    , m_read_wrap{0}
-    , m_write_addr{0}
-    , m_write_increment{0}
-    , m_write_wrap{0}
-    , m_transfer_size{TransferSize::BYTE}
-    , m_transfer_count{0}
-    , m_transfer_count_reload{0}
-    , m_reversed{false}
-    , m_id{id}
-    , m_err_bits{0}
-    , m_chain_to{id}
-    , m_in_flight{false}
-    , m_running{false}
-    {}
+    Channel(DMA &dma, uint32_t id);
     virtual void tick() override;
     void abort() { m_running  = false; }
     bool enabled() const { return m_enabled; }
-    void unpaced() { m_dreq = nullptr; m_treq = nullptr; }
-    void paced(DReq &dreq) { m_dreq = &dreq; m_treq = nullptr; dreq.dma_sync(); }
-    void paced(TReq *treq) { m_dreq = &m_own_dreq; m_treq = treq; m_own_dreq.peri_set(0); m_own_dreq.dma_sync(); }
     void read_error_occurred() { m_err_bits |= 0xc000'0000; abort(); irq(); }
     void write_error_occurred() { m_err_bits |= 0xa000'0000; abort(); irq(); }
     void enable_read_wrap(uint32_t log2) { m_read_wrap = (1u << log2) - 1; }
@@ -115,6 +92,7 @@ namespace RP2040::DMA{
       if (busy()) return;
       m_running = true; 
       m_transfer_count = m_transfer_count_reload;
+      m_dreq.sync();
     }
     bool high_priority() const { return m_reg_ctrl & 0x0000'0002; }
     bool irq_quiet() const { return m_reg_ctrl & 0x0020'0000; }
@@ -149,7 +127,7 @@ namespace RP2040::DMA{
     void set_treq(uint32_t treq);
   protected:
   private:
-    void irq() {};
+    void irq();
     bool try_schedule();
     void complete();
     void reload() {
@@ -157,9 +135,7 @@ namespace RP2040::DMA{
       m_in_flight = false;
     }
     DMA &m_dma;
-    DReq *m_dreq;
-    DReq m_own_dreq;
-    TReq *m_treq;
+    DReqSink m_dreq;
     bool m_enabled;
     uint32_t m_read_addr, m_read_increment, m_read_wrap;
     uint32_t m_write_addr, m_write_increment, m_write_wrap;
@@ -183,29 +159,64 @@ namespace RP2040::DMA{
     CTRL,
   };
 
+  class TReqTimer final : public IClockable, public IResettable, public DReqSource {
+  public:
+    virtual void tick() override { DReqSource::operator++(); }
+    virtual void sync() override { }
+    virtual void reset() override {};
+  private:
+    uint16_t m_idiv, m_fdiv;
+  };
+
   class DMA final : public IClockable, public IPeripheralPort{
   public:
-    DMA(Bus::AHB &ahb)
+    using dreq_list_t = std::array<std::reference_wrapper<DReqSource>, 40>;
+    DMA(Bus::AHB &ahb, dreq_list_t dreqs)
     : m_read_master{read_master()}
     , m_write_master{write_master()}
+    , m_dreqs{dreqs}
     , m_channels{{{*this, 0}, {*this, 1}, {*this, 2}, {*this, 3}, {*this, 4}, {*this, 5}, {*this, 6}, {*this, 7}, {*this, 8}, {*this, 9}, {*this, 10}, {*this, 11}}}
     , m_ahb{ahb}
     {
-      std::cout << "DMA" << std::endl;
+      std::cout << "DMA" << std::hex << &dreq_pio0_rx0() << std::endl;
+      
 
     }
   #define DREQ_EVAL(a, b) b = a,
     enum DReqNum{
       ENUM_DREQS(DREQ_EVAL)
+      DREQ_MAX,
+      dma_timer0 = 0x3b,
+      dma_timer1 = 0x3c,
+      dma_timer2 = 0x3d,
+      dma_timer3 = 0x3e,
+      dma_permanent = 0x3f,
     };
   #undef DREQ_EVAL
-    DReq &get_dreq(DReqNum dreq) { return m_dreqs[dreq]; }
-    const DReq &get_dreq(DReqNum dreq) const { return m_dreqs[dreq]; }
+    DReqSource &get_dreq(DReqNum dreq) { 
+      #define DREQ_EVAL(a,b) case b: return m_dreqs[DReqNum::b];
+      switch(dreq){
+        ENUM_DREQS(DREQ_EVAL)
+        case dma_timer0: return treq_timer0();
+        case dma_timer1: return treq_timer1();
+        case dma_timer2: return treq_timer2();
+        case dma_timer3: return treq_timer3();
+        case dma_permanent: return treq_permanent();
+        default: return NullDReqSource::get();
+      }
+      #undef DREQ_EVAL
+    }
+    const DReqSource &get_dreq(DReqNum dreq) const { return m_dreqs[dreq]; }
   #define DREQ_EVAL(a, b) \
-    DReq &dreq_##b() { return m_dreqs[DReqNum::b]; } \
-    const DReq &dreq_##b() const { return m_dreqs[DReqNum::b]; }
+    DReqSource &dreq_##b() { return m_dreqs[DReqNum::b]; } \
+    const DReqSource &dreq_##b() const { return m_dreqs[DReqNum::b]; }
     ENUM_DREQS(DREQ_EVAL)
   #undef DREQ_EVAL
+    DReqSource &treq_timer0() { return m_treq_timer0; }
+    DReqSource &treq_timer1() { return m_treq_timer1; }
+    DReqSource &treq_timer2() { return m_treq_timer2; }
+    DReqSource &treq_timer3() { return m_treq_timer3; }
+    DReqSource &treq_permanent() { return m_treq_permanent; }
     virtual void tick() override;
     bool schedule(uint32_t read_addr, uint32_t write_addr, TransferSize transfer_size, bool reversed, uint32_t channel_id);
     void chain_trigger(uint32_t channel_id) { m_channels[channel_id].trigger(); }
@@ -217,6 +228,7 @@ namespace RP2040::DMA{
       m_high_priority_mask |= high_priority << channel;
       m_low_priority_mask |= !high_priority << channel;
     }
+    void irq(uint32_t channel) { m_intr |= 1u << channel; }
   protected:
     virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override;
     virtual PortState write_word_internal(uint32_t addr, uint32_t in) override;
@@ -233,10 +245,13 @@ namespace RP2040::DMA{
     bool m_read_waiting_on_tick = true, m_write_waiting_on_tick = true;
     FiFo<std::tuple<uint32_t, uint32_t, TransferSize, uint32_t, bool>, 16> m_addr_fifo;
     FiFo<std::tuple<uint32_t, uint32_t, TransferSize, uint32_t>, 16> m_data_fifo;
-    std::array<DReq, 40> m_dreqs;
+    dreq_list_t m_dreqs;
+    TReqTimer m_treq_timer0, m_treq_timer1, m_treq_timer2, m_treq_timer3;
+    TReqTimer m_treq_permanent;
     std::array<Channel, 12> m_channels;
     uint32_t m_high_priority_mask;
     uint32_t m_low_priority_mask;
     Bus::AHB &m_ahb;
+    uint32_t m_intr = 0;
   };
 } // namespace RP2040::DMA

@@ -5,7 +5,36 @@
 
 using namespace RP2040;
 
+DMA::Channel::Channel(DMA &dma, uint32_t id)
+: m_dma{dma}
+, m_dreq{m_dma.get_dreq(DMA::DReqNum(0))}
+, m_enabled{false}
+, m_read_addr{0}
+, m_read_increment{0}
+, m_read_wrap{0}
+, m_write_addr{0}
+, m_write_increment{0}
+, m_write_wrap{0}
+, m_transfer_size{TransferSize::BYTE}
+, m_transfer_count{0}
+, m_transfer_count_reload{0}
+, m_reversed{false}
+, m_id{id}
+, m_err_bits{0}
+, m_chain_to{id}
+, m_in_flight{false}
+, m_running{false}
+{
+  std::cout << "Channel " << &m_dma.get_dreq(DMA::pio0_rx0) << std::endl;
+
+}
+
 void DMA::DMA::tick(){
+  m_treq_timer0.tick();
+  m_treq_timer1.tick();
+  m_treq_timer2.tick();
+  m_treq_timer3.tick();
+  m_treq_permanent.tick();
   if (m_write_waiting_on_tick){
     m_write_waiting_on_tick = false;
     // std::cout << "DMA::DMA::tick() m_write_master.resume()" << std::endl;
@@ -29,37 +58,27 @@ void DMA::DMA::tick(){
 
 void DMA::Channel::tick(){
   if (!enabled()){
-    std::cout << "Channel::tick() should not be called if channel not enabled!" << std::endl;
+    // std::cout << "Channel::tick() should not be called if channel not enabled!" << std::endl;
     // assert(false && "Channel::tick() should not be called if channel not enabled!");
     return;
   }
   if (!busy() || in_flight()){
     return;
   }
-  std::cout << "Channel::tick() " << m_id << std::endl;
-  if (m_treq) {
-    if (m_treq->operator bool()){
-      m_own_dreq.peri_incr();
-    }
-    if (m_own_dreq.operator bool() && try_schedule()){
-      m_own_dreq.dma_decr();
-    }
-  } else if (m_dreq) {
-    if (m_dreq->operator bool() && try_schedule()){
-      m_dreq->dma_decr();
-    }
+  // std::cout << "Channel::tick() " << m_id  << " dreq count " << m_dreq.operator unsigned int() << std::endl;
+  if (m_dreq && try_schedule()) {
+    m_dreq--;
   } else {
-    //run as fast as possible
-    try_schedule();
+    return;
   }
 
 }
 
 bool DMA::Channel::try_schedule(){
-  std::cout << "Channel::try_schedule() " << m_transfer_count << std::endl;
+  // std::cout << "Channel::try_schedule() " << m_transfer_count << std::endl;
   if (!m_dma.schedule(m_read_addr, m_write_addr, m_transfer_size, m_reversed, m_id))
     return false; // try again later
-  std::cout << "Ok" << std::endl;
+  // std::cout << "Ok" << std::endl;
   m_in_flight++;
   return true;
 }
@@ -75,8 +94,10 @@ void DMA::Channel::complete(){
 }
 
 bool DMA::DMA::schedule(uint32_t read_addr, uint32_t write_addr, TransferSize transfer_size, bool reversed, uint32_t channel_id){
-  if (m_addr_fifo.full())
+  if (m_addr_fifo.full()){
+    // std::cout << "m_addr_fifo full" << std::endl;
     return false;
+  }
   m_addr_fifo.push(std::make_tuple(read_addr, write_addr, transfer_size, channel_id, reversed));
   return true;
 }
@@ -91,7 +112,7 @@ BusMaster DMA::DMA::read_master(){
     do
       co_await next_read_tick();
     while (m_addr_fifo.empty());
-    std::cout << "DMA::DMA::read_master()" << std::endl;
+    // std::cout << "DMA::DMA::read_master()" << std::endl;
     auto [read_addr, write_addr, transfer_size, channel_id, reversed] = m_addr_fifo.pop();
     uint32_t transfer_data;
     try{
@@ -132,8 +153,8 @@ BusMaster DMA::DMA::write_master(){
     do
       co_await next_write_tick();
     while(m_data_fifo.empty());
-    std::cout << "DMA::DMA::write_master()" << std::endl;
     auto [write_addr, data, transfer_size, channel_id] = m_data_fifo.pop();
+    // std::cout << "DMA::DMA::write_master(" << std::hex << write_addr << "," << data << ")" << std::endl;
     try{
       switch(transfer_size){
         case TransferSize::BYTE:{
@@ -192,27 +213,38 @@ BusMaster DMA::DMA::write_master(){
 
 
 PortState DMA::DMA::read_word_internal(uint32_t addr, uint32_t &out){
-  std::cout << "DMA::DMA::read_word_internal(" << std::hex << addr << ")" << std::endl;
+  // std::cout << "DMA::DMA::read_word_internal(" << std::hex << addr << ")" << std::endl;
   switch(addr & 0x0000'0fff) {
     ENUM_DMA_CHANNELS(ENUM_ALT_REGS_READ)
+    case 0x400: /*INTR*/
+    {
+      out = m_intr;
+    } break;
     default: assert(false);
   }
   // throw std::runtime_error("DMA::DMA::read_word_internal not implemented");
+  return PortState::SUCCESS;
 }
 
 PortState DMA::DMA::write_word_internal(uint32_t addr, uint32_t in){
-  std::cout << "DMA::DMA::write_word_internal(" << std::hex << addr << ", " << in << ")" << std::endl;
+  // std::cout << "DMA::DMA::write_word_internal(" << std::hex << addr << ", " << in << ")" << std::endl;
   std::cout << (addr&0x0000'0fff) << std::endl;
   uint32_t v = addr&0x000'0fff;
   switch(v) {
     ENUM_DMA_CHANNELS(ENUM_ALT_REGS_WRITE)
-    // case 0x00:
-    std::cout << "TEST" << std::endl;
+    case 0x430: /*MULTI_CHAN_TRIGGER*/
+    {
+      for (int i = 0; i < 12; i++) {
+        if (in & (1 << i)) {
+          m_channels[i].trigger(true);
+        }
+      }
+    } break;
     default: 
-    std::cout << "TEST2 " << v << std::endl;
     assert(false);
   }
   // throw std::runtime_error("DMA::DMA::write_word_internal not implemented");
+  return PortState::SUCCESS;
 }
 
 uint32_t DMA::DMA::read_word_internal_pure(uint32_t addr) const{
@@ -268,9 +300,17 @@ void DMA::Channel::control(uint32_t data) {
 }
 
 void DMA::Channel::set_treq(uint32_t treq){
-  if (treq == 0) {
-    m_treq = nullptr;
-    return;
-  }
-  // m_treq = &m_dma.m_treqs[treq];
+  DReqSource &source = m_dma.get_dreq(::RP2040::DMA::DMA::DReqNum(treq));
+  std::cout << "SET TREQ " << &source << " " << this << std::endl;
+  m_dreq.connect(source);
+  m_dreq.sync();
+  std::cout << "SYNC " << m_id 
+            << " " << m_dreq.operator unsigned int() 
+            << " " << &m_dreq.source()
+            << " " << this
+            << std::endl;
+}
+
+void DMA::Channel::irq(){
+  m_dma.irq(m_id);
 }

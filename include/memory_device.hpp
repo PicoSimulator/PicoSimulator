@@ -186,6 +186,7 @@ inline bool MemoryOperation::await_ready() {
   // attempt to complete the operation immediately
   // by registering the operation and observing the
   // return value
+  // std::cout << "await_ready" << std::endl;
   return m_port.register_op(*this);
 }
 

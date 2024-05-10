@@ -54,6 +54,7 @@ namespace RP2040::Bus{
               auto [dev, addr] = m_ahb.lookupBusDeviceAddress(op->addr);
               auto &[q, busy] = m_ahb.m_busOps[dev];
               busy = false;
+              // std::cout << "Mem Op Complete AHB: " << std::dec << dev << std::endl;
               op->complete();
             }
           }

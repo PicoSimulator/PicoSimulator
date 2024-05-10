@@ -11,6 +11,7 @@ target_sources(${TARGET} PRIVATE
   rp2040/peri/xip.cpp
   rp2040/peri/ssi.cpp
   rp2040/peri/dma/dma.cpp
+  rp2040/peri/dma/dreq.cpp
   rp2040/pad.cpp
   ext/io/net.cpp
 )

@@ -29,19 +29,15 @@ namespace RP2040::Bus{
       Resets &resets,
       VReg &vreg,
       Clocks &clocks,
-      SysCfg &syscfg,
-      DMA::DReq &uart0_tx_dreq,
-      DMA::DReq &uart0_rx_dreq,
-      DMA::DReq &uart1_tx_dreq,
-      DMA::DReq &uart1_rx_dreq
+      SysCfg &syscfg
     ) 
     : m_runner{bus_task().get_handle()}
     , m_resets{resets}
     , m_vreg{vreg}
     , m_clocks{clocks}
     , m_syscfg{syscfg}
-    , m_uart0{uart0_tx_dreq, uart0_rx_dreq}
-    , m_uart1{uart1_tx_dreq, uart1_rx_dreq}
+    , m_uart0{}
+    , m_uart1{}
     {}
     virtual void tick() override;
     Awaitable<uint8_t> read_byte_internal(uint32_t addr);
@@ -56,6 +52,7 @@ namespace RP2040::Bus{
     UART &uart1() { return m_uart1; }
   protected:
     virtual bool register_op(MemoryOperation &op) override final{
+      // std::cout << "APB register " << uintptr_t(&op) << std::endl;
       assert(m_op == nullptr);
       m_op = &op;
       if(m_waiting_on_op)
@@ -84,6 +81,7 @@ namespace RP2040::Bus{
       if (m_op != nullptr) {
         auto *op = m_op;
         m_op = nullptr;
+        std::cout << "APB completing" << std::endl;
         op->complete();
       }
       return awaitable{*this};
