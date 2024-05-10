@@ -156,6 +156,7 @@ private:
       char c;
       if (m_file.is_open()) {
         if (m_file.readsome(&c, 1) == 1) {
+          std::cout << "UART CHAR RECEIVED: " << c << std::endl;
           // check for overflow
           m_rx_fifo.push(c);
           m_shift_in_counter = wordlength();
@@ -171,8 +172,8 @@ private:
     return (m_lcr_h >> 5) & 3;
   }
 
-  DReqFiFo<uint32_t, 32> m_tx_fifo;
-  DReqFiFo<uint32_t, 32> m_rx_fifo;
+  DReqTxFiFo<uint32_t, 32> m_tx_fifo;
+  DReqRxFiFo<uint32_t, 32> m_rx_fifo;
 
   uint32_t m_status;
   uint32_t m_ibrd;
