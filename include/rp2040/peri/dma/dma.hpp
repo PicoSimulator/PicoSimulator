@@ -88,7 +88,10 @@ namespace RP2040::DMA{
     // bool busy() const { return false;}
     bool busy() const { return m_transfer_count != 0 && m_running;}
     void trigger(bool nnull = true) { 
-      if (!nnull) return; 
+      if (!nnull) {
+        irq();
+        return;
+      }
       if (busy()) return;
       m_running = true; 
       m_transfer_count = m_transfer_count_reload;

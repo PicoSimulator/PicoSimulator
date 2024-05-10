@@ -232,6 +232,10 @@ PortState DMA::DMA::write_word_internal(uint32_t addr, uint32_t in){
   uint32_t v = addr&0x000'0fff;
   switch(v) {
     ENUM_DMA_CHANNELS(ENUM_ALT_REGS_WRITE)
+    case 0x40c: /*INTS0*/
+    {
+      m_intr &= ~in;
+    } break;
     case 0x430: /*MULTI_CHAN_TRIGGER*/
     {
       for (int i = 0; i < 12; i++) {
@@ -241,7 +245,8 @@ PortState DMA::DMA::write_word_internal(uint32_t addr, uint32_t in){
       }
     } break;
     default: 
-    assert(false);
+      std::cout << "DMA::DMA::write_word_internal(" << std::hex << addr << ", " << in << ")" << std::endl;
+      assert(false);
   }
   // throw std::runtime_error("DMA::DMA::write_word_internal not implemented");
   return PortState::SUCCESS;
