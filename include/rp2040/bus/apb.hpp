@@ -81,7 +81,7 @@ namespace RP2040::Bus{
       if (m_op != nullptr) {
         auto *op = m_op;
         m_op = nullptr;
-        std::cout << "APB completing" << std::endl;
+        // std::cout << "APB completing" << std::endl;
         op->complete();
       }
       return awaitable{*this};

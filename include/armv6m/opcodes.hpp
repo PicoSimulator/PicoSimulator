@@ -315,7 +315,7 @@
     uint32_t imm8 = (opcode >> 16) & 0xff;\
     do_disasm({\
       std::cout << FMT_op16(opcode) \
-                << FMT_dis_imm8Rdn("ADD", Rdn, imm8)\
+                << FMT_dis_imm8Rdn("ADD", imm8, Rdn)\
                 << std::endl;\
     })\
     do_exec({\

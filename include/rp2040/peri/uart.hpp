@@ -52,6 +52,9 @@ protected:
           m_status &= ~(1 << 4);
         }
         break;
+      case UARTFR:
+        out = (m_tx_fifo.full() << 5) | (m_tx_fifo.empty() << 7) | (m_rx_fifo.empty() << 4);
+        break;
       case UARTCR: out = m_control; break;
       case UARTIBRD: out = m_ibrd; break;
       case UARTFBRD: out = m_fbrd; break;

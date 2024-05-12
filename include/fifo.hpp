@@ -1,29 +1,54 @@
 #pragma once
 
 #include <cstdint>
+#include <cassert>
 #include "rp2040/peri/dma/dreq.hpp"
 
-template<class T, size_t N>
-class FiFo {
+template<class T>
+class IFiFo {
 public:
-  FiFo() : m_head{0}, m_count{0} {}
-  void push(T t) {
-    if (m_count < N)
-      m_data[(m_head + m_count++) % N] = t;
+  virtual void push(T t) = 0;
+  virtual T pop() = 0;
+  virtual T &peek() = 0;
+  virtual const T &peek() const = 0;
+  virtual size_t count() const = 0;
+  virtual bool empty() const = 0;
+  virtual bool full() const = 0;
+  virtual size_t size() const = 0;
+protected:
+private:
+};
+
+template<class T, size_t N>
+class FiFoBase : public IFiFo<T>{
+public:
+  FiFoBase() : m_head{0}, m_count{0} {}
+  virtual void push(T t) override { return push_internal(t); }
+  virtual T pop() override { return pop_internal(); }
+  virtual T &peek() override { 
+    assert(!empty());
+    return m_data[m_head]; 
   }
-  T pop() {
-    if (m_count == 0) return T{};
+  virtual const T &peek() const override { 
+    assert(!empty());
+    return m_data[m_head]; 
+  }
+  virtual size_t count() const override { return m_count; }
+  virtual bool empty() const override { return m_count == 0; }
+  virtual bool full() const override { return m_count == N; }
+  virtual size_t size() const override { return N; }
+protected:
+  void push_internal(T t) {
+    assert (!full());
+    m_data[(m_head + m_count++) % N] = t;
+  }
+  T pop_internal() {
+    assert (!empty());
     T t = m_data[m_head];
     m_head = (m_head + 1) % N;
     m_count--;
     return t;
   }
-  T &peek() { return m_data[m_head]; }
-  const T &peek() const { return m_data[m_head]; }
-  size_t count() const { return m_count; }
-  bool empty() const { return m_count == 0; }
-  bool full() const { return m_count == N; }
-protected:
 private:
   std::array<T, N> m_data;
   size_t m_head;
@@ -31,68 +56,35 @@ private:
 };
 
 template<class T, size_t N>
-class DReqTxFiFo final : private RP2040::DMA::DReqSource {
+class FiFo final : public FiFoBase<T, N> {
+};
+
+template<class T, size_t N>
+class DReqTxFiFo final : public FiFoBase<T, N>, private RP2040::DMA::DReqSource{
 public:
   DReqSource &dreq() { return *this; }
-  DReqTxFiFo() : m_head{0}, m_count{0} {}
-  void push(T t) {
-    if (m_count >= N)
-      return;
-    m_data[(m_head + m_count++) % N] = t;
-
-  }
-  T pop() {
-    if (m_count == 0) return T{};
-    T t = m_data[m_head];
-    m_head = (m_head + 1) % N;
-    m_count--;
+  virtual T pop() override {
+    auto t = FiFoBase<T, N>::pop_internal();
     dreq()++;
     return t;
   }
-  T &peek() { return m_data[m_head]; }
-  const T &peek() const { return m_data[m_head]; }
-  size_t count() const { return m_count; }
-  bool empty() const { return m_count == 0; }
-  bool full() const { return m_count == N; }
 protected:
 private:
   void sync() override final {
-    dreq() += N-m_count;
+    dreq() += N-count();
   }
-  std::array<T, N> m_data;
-  size_t m_head;
-  size_t m_count;
 };
 template<class T, size_t N>
-class DReqRxFiFo final : private RP2040::DMA::DReqSource {
+class DReqRxFiFo final : public FiFoBase<T, N>, private RP2040::DMA::DReqSource{
 public:
   DReqSource &dreq() { return *this; }
-  DReqRxFiFo() : m_head{0}, m_count{0} {}
-  void push(T t) {
-    if (m_count >= N)
-      return;
-    m_data[(m_head + m_count++) % N] = t;
+  virtual void push(T t) override {
+    FiFoBase<T, N>::push_internal(t);
     dreq()++;
-
   }
-  T pop() {
-    if (m_count == 0) return T{};
-    T t = m_data[m_head];
-    m_head = (m_head + 1) % N;
-    m_count--;
-    return t;
-  }
-  T &peek() { return m_data[m_head]; }
-  const T &peek() const { return m_data[m_head]; }
-  size_t count() const { return m_count; }
-  bool empty() const { return m_count == 0; }
-  bool full() const { return m_count == N; }
 protected:
 private:
   void sync() override final {
-    dreq() += m_count;
+    dreq() += N-count();
   }
-  std::array<T, N> m_data;
-  size_t m_head;
-  size_t m_count;
 };

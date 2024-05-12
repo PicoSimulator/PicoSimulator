@@ -1,3 +1,7 @@
+#include <signal.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
 #include "rp2040.hpp"
 #include "argparse/argparse.hpp"
 
@@ -9,6 +13,11 @@ struct MyArgs : public argparse::Args {
 
 RP2040::RP2040 g_rp2040{};
 
+void my_handler(int s){
+  std::cerr << "EXITING" << std::endl;
+  exit(1); 
+}
+
 int main(int argc, char** argv)
 {
   auto args = argparse::parse<MyArgs>(argc, argv);
@@ -18,6 +27,14 @@ int main(int argc, char** argv)
     std::cout << "test" << std::endl;
     g_rp2040.UART0().open(*args.uart0);
   }
+  
+  struct sigaction sigIntHandler;
+
+  sigIntHandler.sa_handler = my_handler;
+  sigemptyset(&sigIntHandler.sa_mask);
+  sigIntHandler.sa_flags = 0;
+
+  sigaction(SIGINT, &sigIntHandler, NULL);
 
   g_rp2040.reset();
   g_rp2040.run(args.max_ticks);
