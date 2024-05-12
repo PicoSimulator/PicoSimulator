@@ -32,10 +32,10 @@ public:
     }
   }
   void open(const std::string & path) {
-    m_file.rdbuf()->pubsetbuf(0, 0);
-    m_file.open(path, std::ios::binary | std::ios::out | std::ios::in);
-    if (m_file.badbit)
-      std::cout << "Failed to open file" << std::endl;
+    m_infile.rdbuf()->pubsetbuf(0, 0);
+    m_infile.open(path, std::ios::binary | std::ios::out | std::ios::in);
+    m_outfile.rdbuf()->pubsetbuf(0, 0);
+    m_outfile.open(path, std::ios::binary | std::ios::out | std::ios::in);
   }
   RP2040::DMA::DReqSource &tx_dreq() { return m_tx_fifo.dreq(); }
   RP2040::DMA::DReqSource &rx_dreq() { return m_rx_fifo.dreq(); }
@@ -147,9 +147,12 @@ private:
     if (m_control & Control::TX_EN && m_shift_out_counter == 0 && !m_tx_fifo.empty()) {
       m_shift_out_counter = wordlength();
       char c = m_tx_fifo.pop();
-      if (m_file.is_open()) {
-        m_file.write(&c, 1);
-        m_file.flush();
+      if (m_outfile.is_open()) {
+        // m_outfile.seekp(0, std::ios::cur);
+        m_outfile.write(&c, 1);
+        m_outfile.flush();
+        if (m_outfile.badbit)
+        std::cout << "UART CHAR SENT: " << c << std::endl;
       }
     } else if (m_shift_out_counter > 0) {
       m_shift_out_counter--;
@@ -157,11 +160,12 @@ private:
     if (m_control & Control::RX_EN && m_shift_in_counter == 0) {
       m_shift_in_counter = wordlength();
       char c;
-      if (m_file.is_open()) {
-        if (m_file.readsome(&c, 1) == 1) {
+      if (m_infile.is_open()) {
+        if (m_infile.readsome(&c, 1) == 1) {
           std::cout << "UART CHAR RECEIVED: " << c << std::endl;
           // check for overflow
-          m_rx_fifo.push(c);
+          if (!m_rx_fifo.full())
+            m_rx_fifo.push(c);
           m_shift_in_counter = wordlength();
         }
       }
@@ -189,7 +193,8 @@ private:
   uint32_t m_idiv;
   uint32_t m_fdiv;
 
-  std::fstream m_file;
+  std::ofstream m_outfile;
+  std::ifstream m_infile;
 
   uint32_t m_shift_in_counter;
   uint32_t m_shift_out_counter;
