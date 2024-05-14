@@ -117,10 +117,26 @@ Task AHB::bus_task(uint32_t id)
         co_await write_halfword_internal(op.addr, op.data);
         op.return_void();
         break;
-      case MemoryOperation::OpType::WRITE_WORD: 
-        co_await write_word_internal(op.addr, op.data);
+      case MemoryOperation::OpType::WRITE_WORD: {
+        auto devoffset = lookupBusDeviceAddress(op.addr);
+        auto dev = std::get<0>(devoffset);
+        auto offset = std::get<1>(devoffset);
+        // std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
+        switch(dev) {
+          case BusDevice::ROM: /* [8192] */  break;
+          case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_word(m_rp2040.SRAM0(), offset, op.data); break;
+          case BusDevice::SRAM1: /* [32768] */ byte_array_write_as_word(m_rp2040.SRAM1(), offset, op.data); break;
+          case BusDevice::SRAM2: /* [32768] */ byte_array_write_as_word(m_rp2040.SRAM2(), offset, op.data); break;
+          case BusDevice::SRAM3: /* [32768] */ byte_array_write_as_word(m_rp2040.SRAM3(), offset, op.data); break;
+          case BusDevice::SRAM4: /* [2048] */ byte_array_write_as_word(m_rp2040.SRAM4(), offset, op.data); break;
+          case BusDevice::SRAM5: /* [2048] */ byte_array_write_as_word(m_rp2040.SRAM5(), offset, op.data); break;
+          case BusDevice::APB: co_await m_rp2040.APB().write_word(op.addr, op.data); break;
+          case BusDevice::XIP: co_await m_rp2040.XIP().write_word(op.addr, op.data); break;
+          case BusDevice::AHBLITE: m_rp2040.AHBLite().write_word(op.addr, op.data); break;
+          default: throw ARMv6M::BusFault{op.addr};
+        }
         op.return_void();
-        break;
+      } break;
     }
   }
 }

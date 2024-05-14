@@ -8,12 +8,13 @@
 struct MyArgs : public argparse::Args {
   std::string &binary = arg("flash_binary", "Path to binary file to load into flash");
   std::optional<std::string> &uart0 = kwarg("uart0", "Path to UART0 file, can be PTY");
-  int &max_ticks = kwarg("max_ticks", "Number of ticks to run").set_default(std::numeric_limits<int>::max());
+  unsigned int &max_ticks = kwarg("max_ticks", "Number of ticks to run").set_default(std::numeric_limits<unsigned int>::max());
 };
 
 RP2040::RP2040 g_rp2040{};
 
 void my_handler(int s){
+  std::cerr << "Run for " << std::dec << g_rp2040.tickcnt() << " ticks" << std::endl;
   std::cerr << "EXITING" << std::endl;
   exit(1); 
 }
@@ -35,7 +36,6 @@ int main(int argc, char** argv)
   sigIntHandler.sa_flags = 0;
 
   sigaction(SIGINT, &sigIntHandler, NULL);
-
   g_rp2040.reset();
   g_rp2040.run(args.max_ticks);
 }

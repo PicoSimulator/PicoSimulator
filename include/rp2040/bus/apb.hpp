@@ -29,15 +29,19 @@ namespace RP2040::Bus{
       Resets &resets,
       VReg &vreg,
       Clocks &clocks,
-      SysCfg &syscfg
+      SysCfg &syscfg,
+      std::array<std::reference_wrapper<InterruptSource>, 4> timer_irqs,
+      InterruptSource &uart0_irq,
+      InterruptSource &uart1_irq
     ) 
     : m_runner{bus_task().get_handle()}
     , m_resets{resets}
     , m_vreg{vreg}
     , m_clocks{clocks}
     , m_syscfg{syscfg}
-    , m_uart0{}
-    , m_uart1{}
+    , m_uart0{uart0_irq}
+    , m_uart1{uart1_irq}
+    , m_timer{timer_irqs}
     {}
     virtual void tick() override;
     Awaitable<uint8_t> read_byte_internal(uint32_t addr);

@@ -35,24 +35,39 @@ public:
   }
   virtual size_t count() const override { return m_count; }
   virtual bool empty() const override { return m_count == 0; }
-  virtual bool full() const override { return m_count == N; }
+  virtual bool full() const override { return enabled()?m_count == N:m_count; }
   virtual size_t size() const override { return N; }
+  void enable(bool en = true) { m_enabled = en; }
+  void disable() { enable(false); }
+  bool enabled() const { return m_enabled; }
 protected:
   void push_internal(T t) {
     assert (!full());
-    m_data[(m_head + m_count++) % N] = t;
+    if (enabled()){
+      m_data[(m_head + m_count++) % N] = t;
+    } else {
+      m_data[m_head] = t;
+      m_count = 1;
+    }
   }
   T pop_internal() {
     assert (!empty());
-    T t = m_data[m_head];
-    m_head = (m_head + 1) % N;
-    m_count--;
-    return t;
+    if (enabled()){
+      T t = m_data[m_head];
+      m_head = (m_head + 1) % N;
+      m_count--;
+      return t;
+    } else {
+      T t = m_data[m_head];
+      m_count = 0;
+      return t;
+    }
   }
 private:
   std::array<T, N> m_data;
   size_t m_head;
   size_t m_count;
+  bool m_enabled = true;
 };
 
 template<class T, size_t N>

@@ -11,7 +11,8 @@
 
 class UART final : public IPeripheralPort, public IClockable{
 public:
-  UART()
+  UART(InterruptSource &irq_source)
+  : m_irqs{irq_source}
   {
     m_idiv = 0;
     m_fdiv = 0;
@@ -39,21 +40,41 @@ public:
   }
   RP2040::DMA::DReqSource &tx_dreq() { return m_tx_fifo.dreq(); }
   RP2040::DMA::DReqSource &rx_dreq() { return m_rx_fifo.dreq(); }
+  enum IRQ{
+    RIM,
+    CTSM,
+    DCDM,
+    DSRM,
+    RX,
+    TX,
+    RT,
+    FE,
+    PE,
+    BE,
+    OE,
+  };
+
+  InterruptSource &get_irq(IRQ irq) { return m_irqs[irq]; }
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
     out = 0;
+    std::cout << "UART READ_WORD: " << std::hex << addr << std::endl;
     switch(addr & 0xff) {
       case UARTDR:
         if (!m_rx_fifo.empty()) {
           out = m_rx_fifo.pop();
         } else {
           out = 0;
-          m_status &= ~(1 << 4);
+          // m_status &= ~(1 << 4);
         }
         break;
+      case UARTRSR: out = m_status; break;
       case UARTFR:
         out = (m_tx_fifo.full() << 5) | (m_tx_fifo.empty() << 7) | (m_rx_fifo.empty() << 4);
+        break;
+      case UARTIMSC:
+        out = m_irqs.mask();
         break;
       case UARTCR: out = m_control; break;
       case UARTIBRD: out = m_ibrd; break;
@@ -71,21 +92,36 @@ protected:
   }
   virtual PortState write_word_internal(uint32_t addr, uint32_t in) override final
   {
+    std::cout << "UART WRITE_WORD: " << std::hex << addr << " " << in << std::endl;
     switch(addr & 0xff) {
       case UARTDR:
         if (!m_tx_fifo.full()) {
           m_tx_fifo.push(in);
           std::cout << "UART DR: (" << char(in) << ")" << std::endl;
+          if (m_tx_fifo.enabled() && m_tx_fifo.FiFoBase::count() == m_txfifo_threshold) {
+            
+          }
         } else {
           std::cout << "UART TX FIFO OVERFLOW!" << std::endl;
         }
         break;
+      case UARTRSR: m_status &= ~in; break;
+      case UARTFR: break; // READ ONLY REG
       case UARTIBRD: m_ibrd = in & 0x3fff; break;
       case UARTFBRD: m_fbrd = in & 0x3f; break;
-      case UARTLCR_H: break;
+      case UARTLCR_H: 
+      {
+        m_rx_fifo.enable(in & 0x10);
+        m_tx_fifo.enable(in & 0x10);
+      }
       case UARTCR:
         m_control = in;
         break;
+      case UARTIFLS:
+        m_txfifo_threshold = in & 0x3;
+        m_rxfifo_threshold = (in >> 3) & 0x3;
+        break;
+      case UARTIMSC: m_irqs.mask(in); break;
       case UARTICR:
         m_status &= ~in;
         break;
@@ -96,7 +132,40 @@ protected:
   }
   virtual uint32_t read_word_internal_pure(uint32_t addr) const override final
   {
-    return 0;
+    switch (addr & 0xff) {
+      case UARTFR:
+        return (m_tx_fifo.full() << 5) | (m_tx_fifo.empty() << 7) | (m_rx_fifo.empty() << 4);
+      case UARTLCR_H:
+        return m_lcr_h;
+      case UARTCR:
+        return m_control;
+      case UARTIFLS:
+        return 0;
+      case UARTIMSC:
+        return m_irqs.mask();
+      case UARTIBRD:
+        return m_ibrd;
+      case UARTFBRD:
+        return m_fbrd;
+      case UARTPERIPHID0:
+        return 0x11;
+      case UARTPERIPHID1:
+        return 0x10;
+      case UARTPERIPHID2:
+        return 0x34;
+      case UARTPERIPHID3:
+        return 0x00;
+      case UARTPCELLID0:
+        return 0x0d;
+      case UARTPCELLID1:
+        return 0xf0;
+      case UARTPCELLID2:
+        return 0x05;
+      case UARTPCELLID3:
+        return 0xb1;
+    }
+    std::cout << "UART READ_WORD_PURE: " << std::hex << addr << std::endl;
+    assert(false);
   }
 
 private:
@@ -148,11 +217,16 @@ private:
       m_shift_out_counter = wordlength();
       char c = m_tx_fifo.pop();
       if (m_outfile.is_open()) {
-        // m_outfile.seekp(0, std::ios::cur);
         m_outfile.write(&c, 1);
         m_outfile.flush();
-        if (m_outfile.badbit)
         std::cout << "UART CHAR SENT: " << c << std::endl;
+      }
+      if (!m_tx_fifo.enabled() && m_tx_fifo.empty()) {
+        // there's only one space when disabled 
+        // so that empty check is a bit unnecessary
+        get_irq(IRQ::TX).raise();
+      } else if(m_tx_fifo.FiFoBase::count() == m_txfifo_threshold) {
+        get_irq(IRQ::TX).raise();
       }
     } else if (m_shift_out_counter > 0) {
       m_shift_out_counter--;
@@ -163,15 +237,29 @@ private:
       if (m_infile.is_open()) {
         if (m_infile.readsome(&c, 1) == 1) {
           std::cout << "UART CHAR RECEIVED: " << c << std::endl;
-          // check for overflow
-          if (!m_rx_fifo.full())
+          // check for overrun
+          if (!m_rx_fifo.full()) {
             m_rx_fifo.push(c);
+          }
+          else{
+            get_irq(IRQ::OE).raise();
+            m_status |= 1 << 3;
+            std::cout << "UART RX FIFO OVERRUN!" << std::endl;
+          }
+          if (!m_rx_fifo.enabled() && m_rx_fifo.full()) {
+            // again that full check is a bit redundant
+            get_irq(IRQ::RX).raise();
+          } else if (m_rx_fifo.FiFoBase::count() == m_rxfifo_threshold) {
+            get_irq(IRQ::RX).raise();
+          }
           m_shift_in_counter = wordlength();
         }
       }
     } else if (m_shift_in_counter > 0) {
       m_shift_in_counter--;
     }
+    // std::cout << m_shift_in_counter << std::endl;;
+    // std::cout << m_shift_out_counter << std::endl;;
   }
 
   uint32_t wordlength() const
@@ -198,5 +286,10 @@ private:
 
   uint32_t m_shift_in_counter;
   uint32_t m_shift_out_counter;
+
+  uint32_t m_txfifo_threshold = 0;
+  uint32_t m_rxfifo_threshold = 0;
+
+  InterruptSourceMulti m_irqs;
 
 };

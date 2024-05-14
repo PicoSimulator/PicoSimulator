@@ -40,7 +40,7 @@ PortState SSI::write_word_internal(uint32_t addr, uint32_t in)
   switch(addr & 0xfc) {
     case RegOffset::CTRLR0: m_ctrlr0 = in; break;
     case RegOffset::CTRLR1: m_ctrlr1 = in; break;
-    case RegOffset::DR0: m_tx_fifo.push(in); break;
+    case RegOffset::DR0: if(!m_tx_fifo.full())m_tx_fifo.push(in); break;
     case RegOffset::SPI_CTRLR0: m_spi_ctrlr0 = in; break;
     default: return PortState::FAULT;
   }

@@ -59,9 +59,25 @@ RP2040::RP2040::RP2040()
   /*DREQ_XIP_SSIRX*/ m_null_dreq,
 
 }}
-, m_apb{m_resets, m_vreg, m_clocks, m_syscfg}
+, m_apb{
+    m_resets, 
+    m_vreg, 
+    m_clocks, 
+    m_syscfg, 
+    {
+      m_interrupts.get_source(IRQ::TIMER_IRQ_0),
+      m_interrupts.get_source(IRQ::TIMER_IRQ_1),
+      m_interrupts.get_source(IRQ::TIMER_IRQ_2),
+      m_interrupts.get_source(IRQ::TIMER_IRQ_3),
+    },
+    m_interrupts.get_source(IRQ::UART0_IRQ), 
+    m_interrupts.get_source(IRQ::UART1_IRQ)
+  }
 , m_core_bus{{m_ioports[0], m_ahb}, {m_ioports[1], m_ahb}}
-, m_cores{{m_core_bus[0], "core-0", m_cores[1]}, {m_core_bus[1], "core-1", m_cores[0]}}
+, m_cores{
+  {m_core_bus[0], "core-0", m_cores, m_interrupts}, 
+  {m_core_bus[1], "core-1", m_cores, m_interrupts}
+}
 {
   clk_sys.sink_add(m_cores[0]);
   clk_sys.sink_add(m_cores[1]);
@@ -80,12 +96,11 @@ void RP2040::RP2040::reset()
   m_cores[1].reset();
 }
 
-void RP2040::RP2040::run(int max_ticks)
+void RP2040::RP2040::run(unsigned int max_ticks)
 {
-  int ticks = 0;
-  // while (ticks++ <= 1'000'000) {
+  unsigned int ticks = 0;
   while (ticks++ <= max_ticks) {
-    // std::cout << "\nTICK " << std::dec << ticks << std::endl;
+    m_tickcnt++;
     clk_sys.tick();
     clk_ref.tick();
     clk_peri.tick();

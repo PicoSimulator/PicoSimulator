@@ -36,16 +36,30 @@ Task APB::bus_task()
 {
   while(true) {
     auto &op = co_await next_op();
-    switch(m_op->optype) {
+    switch(op.optype) {
       case MemoryOperation::READ_BYTE:
-        m_op->return_value(co_await read_byte_internal(m_op->addr));
-        break;
+        // m_op->return_value(co_await read_byte_internal(m_op->addr));
+        // break;
       case MemoryOperation::READ_HALFWORD:
-        m_op->return_value(co_await read_halfword_internal(m_op->addr));
-        break;
+        // m_op->return_value(co_await read_halfword_internal(m_op->addr));
+        // break;
       case MemoryOperation::READ_WORD:
-        m_op->return_value(co_await read_word_internal(m_op->addr));
-        break;
+      {
+        #define ENUM_PERIPHERAL(peri_addr, name, synch, _) case peri_addr: synch (name.read_word, op.addr, out); break;
+        #define SYNC(fun, addr, out) fun(addr, out)
+        #define ASYNC(fun, addr, out) out = co_await fun(addr) 
+        
+        uint32_t out;
+        switch(op.addr & 0x00ff'c000) {
+          APB_PERIPHERALS(ENUM_PERIPHERAL)
+          default:
+            throw ARMv6M::BusFault{op.addr};
+        }
+        #undef ENUM_PERIPHERAL
+        #undef SYNC
+        #undef ASYNC
+        m_op->return_value(out);
+      } break;
       case MemoryOperation::WRITE_BYTE:
         co_await write_byte_internal(m_op->addr, m_op->data);
         m_op->return_void();

@@ -33,9 +33,37 @@ namespace RP2040{
 
   class RP2040 final: public IResettable{
   public:
+    enum IRQ{
+      TIMER_IRQ_0 = 0,
+      TIMER_IRQ_1 = 1,
+      TIMER_IRQ_2 = 2,
+      TIMER_IRQ_3 = 3,
+      PWM_IRQ_WRAP = 4,
+      USBCTRL_IRQ = 5,
+      XIP_IRQ = 6,
+      PIO0_IRQ_0 = 7,
+      PIO0_IRQ_1 = 8,
+      PIO1_IRQ_0 = 9,
+      PIO1_IRQ_1 = 10,
+      DMA_IRQ_0 = 11,
+      DMA_IRQ_1 = 12,
+      IO_IRQ_BANK0 = 13,
+      IO_IRQ_QSPI = 14,
+      SIO_IRQ_PROC0 = 15,
+      SIO_IRQ_PROC1 = 16,
+      CLOCKS_IRQ = 17,
+      SPI0_IRQ = 18,
+      SPI1_IRQ = 19,
+      UART0_IRQ = 20,
+      UART1_IRQ = 21,
+      ADC_IRQ_FIFO = 22,
+      I2C0_IRQ = 23,
+      I2C1_IRQ = 24,
+      RTC_IRQ = 25,
+    };
     RP2040();
     virtual void reset() override;
-    void run(int max_ticks);
+    void run(unsigned int max_ticks);
     void load_binary(const std::string &path);
     UART &UART0();
     Bus::APB &APB() { return m_apb; }
@@ -50,11 +78,13 @@ namespace RP2040{
     auto &SRAM4() { return m_SRAM4; }
     auto &SRAM5() { return m_SRAM5; }
 
+    uint64_t tickcnt() const { return m_tickcnt; }
+
   protected:
   private:
     class IOPort final: public IReadWritePort<uint32_t>{
     public:
-      IOPort(uint32_t cpuid, Core::FiFo &tx_fifo, Core::FiFo &rx_fifo) 
+      IOPort(uint32_t cpuid, Core::FiFo &tx_fifo, Core::FiFo &rx_fifo)
       : m_cpuid{cpuid}
       , m_tx_fifo{tx_fifo}
       , m_rx_fifo{rx_fifo}
@@ -77,6 +107,7 @@ namespace RP2040{
       // spinlocks
       // GPIO
     };
+    InterruptSourceSet m_interrupts;
     ClockDiv clk_ref, clk_sys, clk_peri, clk_rtc, clk_usb, clk_adc, clkc_gpout[4];
     const std::array<uint8_t, 16384> m_ROM;
     std::array<uint8_t, 16384> m_XIP_sram;
@@ -91,9 +122,9 @@ namespace RP2040{
 
     class CoreBus final : public IAsyncReadWritePort<uint32_t>{
     public:
-      CoreBus(IOPort &ioport, Bus::AHB &ahb) 
+      CoreBus(IOPort &ioport, Bus::AHB &ahb)
       : m_ioport{ioport}
-      , m_ahb{ahb} 
+      , m_ahb{ahb}
       , m_op{nullptr}
       , m_runner{bus_task().get_handle()}
       {}
@@ -124,13 +155,13 @@ namespace RP2040{
       bool m_waiting_on_op;
       auto next_op(){
         struct awaitable{
-          bool await_ready() { 
+          bool await_ready() {
             return false;
-            return m_bus.m_op != nullptr; 
+            return m_bus.m_op != nullptr;
           }
-          MemoryOperation &await_resume() { 
+          MemoryOperation &await_resume() {
             m_bus.m_waiting_on_op = false;
-            return *m_bus.m_op; 
+            return *m_bus.m_op;
           }
           void await_suspend(std::coroutine_handle<> handle) {
             m_bus.m_waiting_on_op = true;
@@ -180,5 +211,6 @@ namespace RP2040{
     Bus::APB m_apb;
     CoreBus m_core_bus[2];
     ARMv6M::ARMv6MCore m_cores[2];
+    uint64_t m_tickcnt;
   };
 }

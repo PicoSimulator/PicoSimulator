@@ -30,6 +30,7 @@ DMA::Channel::Channel(DMA &dma, uint32_t id)
 }
 
 void DMA::DMA::tick(){
+  if (!(m_low_priority_mask | m_high_priority_mask)) return;
   m_treq_timer0.tick();
   m_treq_timer1.tick();
   m_treq_timer2.tick();

@@ -3,19 +3,16 @@
 #include <algorithm>
 
 void Clock::sink_add(IClockable &c) {
-  if(!this) return;
   m_clock_sinks.push_back(c);
 }
 
 void Clock::sink_remove(IClockable &c) {
-  if(!this) return;
   m_clock_sinks.erase(std::remove_if(m_clock_sinks.begin(), m_clock_sinks.end(), [&c](IClockable &e) {
     return &e == &c;
   }), m_clock_sinks.end());
 }
 
 void Clock::do_tick() {
-  if (!this) return;
   for (auto e : m_clock_sinks) {
     e.get().tick();
   }
@@ -34,8 +31,8 @@ void ClockMux::set_source_index(uint8_t i) {
 }
 
 void ClockDiv::tick() {
-  if(++m_cnt >= m_divisor) {
-    m_cnt = 0;
+  if(m_cnt-- == 0) {
+    m_cnt = m_divisor;
     do_tick();
   }
 }

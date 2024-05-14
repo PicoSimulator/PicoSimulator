@@ -11,11 +11,18 @@
 
 class Timer final : public IPeripheralPort, public IClockable{
 public:
-  Timer() : m_irq_alarm0{"TIMER_IRQ_0"},
-            m_irq_alarm1{"TIMER_IRQ_1"},
-            m_irq_alarm2{"TIMER_IRQ_2"},
-            m_irq_alarm3{"TIMER_IRQ_3"}
+  Timer(
+    std::array<std::reference_wrapper<InterruptSource>, 4> irqs
+  ) : m_irq_alarm0{irqs[0]},
+      m_irq_alarm1{irqs[0]},
+      m_irq_alarm2{irqs[0]},
+      m_irq_alarm3{irqs[0]}
   {
+    m_irq_alarm0.set_name("TIMER_IRQ_0");
+    m_irq_alarm1.set_name("TIMER_IRQ_1");
+    m_irq_alarm2.set_name("TIMER_IRQ_2");
+    m_irq_alarm3.set_name("TIMER_IRQ_3");
+
     m_time = 0;
     m_time_load = 0;
     m_alarm0 = 0;

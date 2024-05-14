@@ -5,22 +5,26 @@
 #include "reset.hpp"
 #include "async.hpp"
 #include "bus.hpp"
+#include "nvic.hpp"
+#include "armv6m/exception.hpp"
 
 #include <coroutine>
 #include <utility>
 #include <string>
 #include <tuple>
+#include <span>
 
 namespace ARMv6M{
 
   class ARMv6MCore final : public IClockable, public IResettable{
   public:
-    ARMv6MCore(IAsyncReadWritePort<uint32_t> &bus, std::string name, ARMv6MCore &other_core) 
+    ARMv6MCore(IAsyncReadWritePort<uint32_t> &bus, std::string name, std::span<ARMv6MCore> all_cores, InterruptSourceSet &irqs) 
     : m_mpu_bus_interface{bus, *this}
     , m_ppb{*this}
     , m_core_task{core_task()}
+    , m_nvic{m_core_irqs, irqs}
     , m_name{std::move(name)}
-    , m_other_core{other_core}
+    , m_cores{all_cores}
     {
 
     }
@@ -29,6 +33,7 @@ namespace ARMv6M{
     BusMaster *run() { return &m_core_task; }
     const uint32_t &VTOR() const { return m_VTOR; }
     uint32_t &VTOR() { return m_VTOR; }
+    NVIC &nvic() { return m_nvic; }
   protected:
   private:
     int instruction_count = 0;
@@ -66,7 +71,15 @@ namespace ARMv6M{
     void set_PSP(uint32_t val) { m_PSP = val; }
     // TODO: Interworking!
     void BLXWritePC(uint32_t target) { m_nextPC = target; }
-    void BXWritePC(uint32_t target) { m_nextPC = target; }
+    void BXWritePC(uint32_t target) { 
+      if ((target & 0xf000'0000) == 0xf000'0000) {
+        std::cout << "BXWritePC: target = " << std::hex << target << std::dec << "\n";
+        // std::terminate();
+        // throw ARMv6M::HardFault{"Interworking exception returtn!"};
+        m_interworking_required = true;
+      }
+      m_nextPC = target; 
+    }
     void BranchTo(uint32_t target) { m_nextPC = target | PC() & 1; }
     void BranchWritePC(uint32_t target) { BranchTo(target&~1); }
     void ALUWritePC(uint32_t target) { BranchWritePC(target); }
@@ -74,13 +87,21 @@ namespace ARMv6M{
     bool m_event;
     bool EventRegistered()  const { return m_event; }
     void ClearEventRegister() { m_event = false; }
-    void SendEvent() { m_other_core.m_event = true; }
+    void SendEvent() { for (ARMv6MCore &core : m_cores) core.m_event = true; }
+
+    bool ExceptionActive(int num) {
+      return m_active_exceptions[num];
+    }
+    NVIC::exception_bits m_active_exceptions;
+    uint8_t m_current_exception;
 
     // enum ProcessorMode{
     //   ThreadMode = 0b10000,
     //   HandlerMode = 0b11011,
     //   ModeMask = 0b11111,
     // };
+
+    InterruptSourceSet m_core_irqs;
 
 
     uint64_t m_tickcnt = 0;
@@ -104,6 +125,7 @@ namespace ARMv6M{
       NEGATIVE = 1<<31,
     };
     bool m_threadMode;
+    bool m_interworking_required = false;
 
     enum Cond{
       EQ = 0b0000,
@@ -216,8 +238,9 @@ namespace ARMv6M{
     MPU m_mpu_bus_interface;
     PPB m_ppb;
     IAsyncReadWritePort<uint32_t> &m_bus_interface = m_mpu_bus_interface;
+    NVIC m_nvic;
     const std::string m_name;
-    ARMv6MCore &m_other_core;
+    std::span<ARMv6MCore> m_cores;
   };
 
 
