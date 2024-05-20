@@ -1505,7 +1505,7 @@
         case Cond::GT: \
           jump = (!(m_APSR & APSR::ZERO) && (!!(m_APSR & APSR::NEGATIVE) == !!(m_APSR & APSR::OVERFLOW))); break; \
         case Cond::LE: \
-          jump = ((m_APSR & APSR::ZERO) && (!!(m_APSR & APSR::NEGATIVE) != !!(m_APSR & APSR::OVERFLOW))); break; \
+          jump = ((m_APSR & APSR::ZERO) || (!!(m_APSR & APSR::NEGATIVE) != !!(m_APSR & APSR::OVERFLOW))); break; \
         default: throw HardFault{"unrecognised branch instr"}; \
       }\
       if (jump) { \
