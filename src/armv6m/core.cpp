@@ -156,7 +156,7 @@ BusMaster ARMv6MCore::core_task()
           co_await m_bus_interface.write_word(frameptr + 0x18, return_address);
           // co_await m_bus_interface.write_word(frameptr + 0x18, ReturnAddress(ExceptionType(exception)));
           //MemA[frameptr+0x1C,4] = (XPSR<31:10>:frameptralign:XPSR<8:0>);
-          co_await m_bus_interface.write_word(frameptr + 0x1C, (XPSR() & 0xFFFFFC00) | (frameptr_align << 8) | (XPSR() & 0x1FF));
+          co_await m_bus_interface.write_word(frameptr + 0x1C, (XPSR() & 0xFFFFFC00) | (frameptr_align << 7) | (XPSR() & 0x1FF));
           //if CurrentMode==Mode_Handler then
           if (!m_threadMode) {
             //LR = 0xFFFFFFF1<31:0>;
