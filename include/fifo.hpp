@@ -35,8 +35,13 @@ public:
   }
   virtual size_t count() const override { return m_count; }
   virtual bool empty() const override { return m_count == 0; }
-  virtual bool full() const override { return enabled()?m_count == N:m_count; }
+  virtual bool full() const override { return enabled()?(m_count == N):m_count; }
   virtual size_t size() const override { return N; }
+
+  /**
+   * When enabled, the FiFo behaves normally.
+   * When disabled, the FiFo behaves as a 1 element FiFo.
+  */
   void enable(bool en = true) { m_enabled = en; }
   void disable() { enable(false); }
   bool enabled() const { return m_enabled; }
