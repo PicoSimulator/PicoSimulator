@@ -21,6 +21,8 @@ public:
     m_lcr_l = 0;
     m_shift_in_counter = 0;
     m_shift_out_counter = 0;
+    m_rx_fifo.enable(false);
+    m_tx_fifo.enable(false);
   }
   void tick() override final
   {
@@ -59,7 +61,7 @@ protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
     out = 0;
-    std::cout << "UART READ_WORD: " << std::hex << addr << std::endl;
+    // std::cout << "UART READ_WORD: " << std::hex << addr << std::endl;
     switch(addr & 0xff) {
       case UARTDR:
         if (!m_rx_fifo.empty()) {
@@ -98,7 +100,7 @@ protected:
         if (!m_tx_fifo.full()) {
           m_tx_fifo.push(in);
           std::cout << "UART DR: (" << char(in) << ")" << std::endl;
-          if (m_tx_fifo.enabled() && m_tx_fifo.FiFoBase::count() == m_txfifo_threshold) {
+          if (m_tx_fifo.enabled() && m_tx_fifo.FiFoBase::count() == tx_fifo_threshold()) {
             
           }
         } else {
@@ -113,13 +115,13 @@ protected:
       {
         m_rx_fifo.enable(in & 0x10);
         m_tx_fifo.enable(in & 0x10);
+        break;
       }
       case UARTCR:
         m_control = in;
         break;
       case UARTIFLS:
-        m_txfifo_threshold = in & 0x3;
-        m_rxfifo_threshold = (in >> 3) & 0x3;
+        m_uartifls = in;
         break;
       case UARTIMSC: m_irqs.mask(in); break;
       case UARTICR:
@@ -225,7 +227,7 @@ private:
         // there's only one space when disabled 
         // so that empty check is a bit unnecessary
         get_irq(IRQ::TX).raise();
-      } else if(m_tx_fifo.FiFoBase::count() == m_txfifo_threshold) {
+      } else if(m_tx_fifo.FiFoBase::count() == tx_fifo_threshold()) {
         get_irq(IRQ::TX).raise();
       }
     } else if (m_shift_out_counter > 0) {
@@ -249,9 +251,12 @@ private:
           if (!m_rx_fifo.enabled() && m_rx_fifo.full()) {
             // again that full check is a bit redundant
             get_irq(IRQ::RX).raise();
-          } else if (m_rx_fifo.FiFoBase::count() == m_rxfifo_threshold) {
+          } else if (m_rx_fifo.FiFoBase::count() == rx_fifo_threshold()) {
+            std::cout << "RX irq raised" << std::endl;
             get_irq(IRQ::RX).raise();
           }
+          std::cout << "UART RX FIFO THRESHOLD: " << int(rx_fifo_threshold()) << std::endl;
+          std::cout << "UART RX FIFO COUNT: " << m_rx_fifo.FiFoBase::count() << std::endl;
           m_shift_in_counter = wordlength();
         }
       }
@@ -260,6 +265,26 @@ private:
     }
     // std::cout << m_shift_in_counter << std::endl;;
     // std::cout << m_shift_out_counter << std::endl;;
+  }
+
+  uint8_t rx_fifo_threshold() const
+  {
+    return (std::array<uint8_t, 5>{4, 8, 16, 24, 28})[rxiflsel()];
+  }
+
+  uint8_t tx_fifo_threshold() const
+  {
+    return (std::array<uint8_t, 5>{4, 8, 16, 24, 28})[txiflsel()];
+  }
+
+  uint8_t rxiflsel() const
+  {
+    return (m_uartifls >> 3) & 0x07;
+  }
+
+  uint8_t txiflsel() const
+  {
+    return m_uartifls & 0x07;
   }
 
   uint32_t wordlength() const
@@ -287,8 +312,7 @@ private:
   uint32_t m_shift_in_counter;
   uint32_t m_shift_out_counter;
 
-  uint32_t m_txfifo_threshold = 0;
-  uint32_t m_rxfifo_threshold = 0;
+  uint32_t m_uartifls;
 
   InterruptSourceMulti m_irqs;
 
