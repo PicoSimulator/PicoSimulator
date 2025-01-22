@@ -7,6 +7,7 @@
 #include "bus.hpp"
 #include "nvic.hpp"
 #include "armv6m/exception.hpp"
+#include "tracing/vcd.hpp"
 
 #include <coroutine>
 #include <utility>
@@ -19,32 +20,58 @@ namespace ARMv6M{
   class ARMv6MCore final : public IClockable, public IResettable{
   public:
     ARMv6MCore(IAsyncReadWritePort<uint32_t> &bus, std::string name, std::span<ARMv6MCore> all_cores, InterruptSourceSet &irqs) 
-    : m_mpu_bus_interface{bus, *this}
+    : m_vcd{name}
+    , m_regs{
+      {"R0", 32},
+      {"R1", 32},
+      {"R2", 32},
+      {"R3", 32},
+      {"R4", 32},
+      {"R5", 32},
+      {"R6", 32},
+      {"R7", 32},
+      {"R8", 32},
+      {"R9", 32},
+      {"R10", 32},
+      {"R11", 32},
+      {"R12", 32},
+      {"SP", 32},
+      {"LR", 32},
+      {"PC", 32},
+    }
+    , m_instr{"INSTR", 32}
+    , m_mpu_bus_interface{bus, *this}
     , m_ppb{*this}
     , m_core_task{core_task()}
     , m_nvic{m_core_irqs, irqs}
     , m_name{std::move(name)}
     , m_cores{all_cores}
     {
-
+      for (int i = 0; i < 16; i++) {
+        m_vcd.add_item(m_regs[i]);
+      }
+      m_vcd.add_item(m_instr);
     }
     void tick() override;
     virtual void reset() override;
     BusMaster *run() { return &m_core_task; }
+    void dump() const;
     const uint32_t &VTOR() const { return m_VTOR; }
     uint32_t &VTOR() { return m_VTOR; }
     NVIC &nvic() { return m_nvic; }
+    void set_trace_enabled(bool enabled) { m_trace_enabled = enabled; }
+    Tracing::VCD::Module &vcd() { return m_vcd; }
   protected:
   private:
     int instruction_count = 0;
 
     void set_PC(uint32_t addr) { m_regs[15] = addr; }
-    uint32_t &PC() { return m_regs[15]; }
-    uint32_t &LR() { return m_regs[14]; }
-    uint32_t &SP() { return m_regs[13]; }
-    const uint32_t &PC() const { return m_regs[15]; }
-    const uint32_t &LR() const { return m_regs[14]; }
-    const uint32_t &SP() const { return m_regs[13]; }
+    Tracing::VCD::Register<uint32_t> &PC() { return m_regs[15]; }
+    Tracing::VCD::Register<uint32_t> &LR() { return m_regs[14]; }
+    Tracing::VCD::Register<uint32_t> &SP() { return m_regs[13]; }
+    uint32_t PC() const { return m_regs[15]; }
+    uint32_t LR() const { return m_regs[14]; }
+    uint32_t SP() const { return m_regs[13]; }
     uint32_t XPSR() const { return m_APSR | m_IPSR | m_EPSR; }
     void set_reg(int reg, uint32_t val) { m_regs[reg] = val; }
     uint32_t get_reg(int reg) const { return m_regs[reg]; }
@@ -105,7 +132,9 @@ namespace ARMv6M{
 
 
     uint64_t m_tickcnt = 0;
-    uint32_t m_regs[16];
+    Tracing::VCD::Module m_vcd;
+    Tracing::VCD::Register<uint32_t> m_regs[16];
+    Tracing::VCD::Register<uint32_t> m_instr;
     uint32_t m_nextPC;
     uint32_t m_MSP, m_PSP;
     uint32_t m_APSR;
@@ -167,7 +196,6 @@ namespace ARMv6M{
       m_waiting_for_tick = true;
       return std::suspend_always{};
     }
-    void dump() const;
     BusMaster core_task();
     BusMaster m_core_task;
     bool m_waiting_for_tick = true;
@@ -241,6 +269,7 @@ namespace ARMv6M{
     NVIC m_nvic;
     const std::string m_name;
     std::span<ARMv6MCore> m_cores;
+    bool m_trace_enabled;
   };
 
 

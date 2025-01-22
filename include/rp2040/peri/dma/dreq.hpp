@@ -51,10 +51,9 @@ namespace RP2040::DMA
   class DReqSink final {
   public:
     DReqSink(DReqSource &source) : m_source{source}{
-      std::cout << "DReqSink sourc: " << std::hex << &source << std::endl;
+      // std::cout << "DReqSink sourc: " << std::hex << &source << std::endl;
     }
     void sync() { 
-      std::cout << "a" << std::hex << uintptr_t(&m_source.get()) << std::endl;
       m_tracking_count = m_source.get().count();
       m_count = 0; 
       m_source.get().sync();

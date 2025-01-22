@@ -1,3 +1,4 @@
+#include "config.h"
 #include "armv6m/core.hpp"
 #include "async.hpp"
 #include "armv6m/exception.hpp"
@@ -79,6 +80,8 @@ BusMaster ARMv6MCore::core_task()
       try{
         if (nvic().check_pending() != NVIC::ExceptionNumber::NONE) {
           std::cout << "exception pending" << std::endl;
+          std::cout << "SP: " << std::hex << SP() << std::dec << std::endl;
+          std::cout << "PC: " << std::hex << PC() << std::dec << std::endl;
           // throw HardFault{"Exception pending"};
           //ExceptionEntry()
           //=================
@@ -209,7 +212,7 @@ BusMaster ARMv6MCore::core_task()
           SP() = m_MSP;
         }
         // fetch
-        uint32_t instr;
+        auto &instr = m_instr;
         if (!T())
         {
           // std::cout << "fetching arm" << std::endl;
@@ -231,14 +234,14 @@ BusMaster ARMv6MCore::core_task()
         m_nextPC = PC() + instr_incr;
         
         #define DO(x) {x}
-        #define DO_DISAS(x) if(m_tickcnt > 10'000'000){std::cout << m_name << ":D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
-        #define DO_TRACE(x) if(m_tickcnt > 10'000'000){std::cout << m_name << ":T:";  {x}}
+        #define DO_DISAS(x) if(m_trace_enabled/* m_tickcnt > 19'999'000 */ && config_ARMv6M_TRACE_ENABLED){std::cout << m_name << ":D:" << std::setw(8) << std::hex << std::setfill('0') << PC() << std::dec << ": ";  {x}}
+        #define DO_TRACE(x) if(m_trace_enabled/* m_tickcnt > 19'999'000 */ && config_ARMv6M_DISAS_ENABLED){std::cout << m_name << ":T:";  {x}}
         #define DO2(x, y) {x}{y}
         #define DONT(x) 
 
         #define OPCODE(prefix, fun) \
           case prefix: \
-            fun(instr, DONT, DO, DONT, this); \
+            fun(instr, DO_DISAS, DO, DO_TRACE, this); \
             break;
 
         #define REP0 OPCODE
@@ -360,6 +363,9 @@ BusMaster ARMv6MCore::core_task()
           //ISB();
 
           m_interworking_required = false;
+          std::cout << "interworking complete" << std::endl;
+          std::cout << "SP: " << std::hex << SP() << std::dec << std::endl;
+          std::cout << "PC: " << std::hex << PC() << std::dec << std::endl;
         }
 
         PC() = m_nextPC;
@@ -483,7 +489,7 @@ BusMaster ARMv6MCore::core_task()
         }
 
       }
-      co_await next_tick();
+      // co_await next_tick();
     }
   }
 }
@@ -585,6 +591,7 @@ PortState ARMv6MCore::PPB::write_halfword(uint32_t addr, uint16_t in){ throw ARM
 PortState ARMv6MCore::PPB::write_word(uint32_t addr, uint32_t in){
   switch(addr) {
     case 0xE000E100: // NVIC ISER
+      std::cout << "nvic.set_enable(" << std::hex << in << ")" << std::endl;
       m_core.nvic().set_enable(in);
       break;
     case 0xE000E180: // NVIC ICER

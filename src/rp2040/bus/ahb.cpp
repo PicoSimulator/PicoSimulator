@@ -17,11 +17,12 @@ using namespace RP2040::Bus;
 void AHB::tick()
 {
   // std::cout << "AHB::tick()" << std::endl;
+  // check if any of the devices on AHB have operations outstanding
   for(int i = 0; i < BusDevice::DEVICE_MAX; i++) {
     auto& [q, busy] = m_busOps[i];
     if (q.empty() || busy)
       continue;
-    auto h = q.front();
+    auto h = q.top();
     // std::cout << "Mem Op Starting AHB: " << std::dec << i << std::endl;
     busy = true;
     q.pop();
@@ -37,8 +38,9 @@ void AHB::tick()
 bool AHB::register_op(MemoryOperation &op)
 {
   // std::cout << "register_op" << std::endl;
-
+  // m_port_address[op.]
   auto [dev, addr] = lookupBusDeviceAddress(op.addr);
+  m_port_address[op.upstream_id] = addr;
 
   auto &[q, busy] = m_busOps[dev];
   q.push(op);
@@ -121,7 +123,7 @@ Task AHB::bus_task(uint32_t id)
         auto devoffset = lookupBusDeviceAddress(op.addr);
         auto dev = std::get<0>(devoffset);
         auto offset = std::get<1>(devoffset);
-        // std::cout << "writing word to " << std::hex << addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << val << std::endl;
+        // std::cout << "writing word to " << std::hex << op.addr << std::dec << " dev " << (int)dev << " offset " << offset << " val " << op.data << std::endl;
         switch(dev) {
           case BusDevice::ROM: /* [8192] */  break;
           case BusDevice::SRAM0: /* [32768] */ byte_array_write_as_word(m_rp2040.SRAM0(), offset, op.data); break;
@@ -165,7 +167,7 @@ inline std::tuple<AHB::BusDevice, uint32_t> AHB::lookupBusDeviceAddress(uint32_t
       if (addr < 0x2004'0000) {
         return {srams[(addr >> 2) & 0b11], ((addr>>2) & 0x0000'fffc) | (addr & 0x3)};
       } else if (addr < 0x2004'2000) {
-        return {srams[4+(addr>>12) & 0b11], addr & 0x0000'0fff};
+        return {srams[4+((addr>>12) & 1)], addr & 0x0000'0fff};
       } else if (addr >= 0x2100'0000) {
         return {srams[(addr>>16) & 0b11], addr & 0x0000'ffff};
       }

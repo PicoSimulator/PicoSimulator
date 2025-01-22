@@ -96,6 +96,7 @@ struct MemoryOperation{
     return optype == WRITE_BYTE || optype == WRITE_HALFWORD || optype == WRITE_WORD;
   }
   IAsyncReadWritePort<uint32_t> &m_port;
+  uint32_t upstream_id;
   std::coroutine_handle<> m_caller = nullptr;
   void return_void() ;
   void return_value(uint32_t value);
@@ -109,35 +110,35 @@ struct MemoryOperation{
     return data;
   }
 
-
 };
 
 template<class Addr>
 class IAsyncReadWritePort{
 public:
-  MemoryOperation read_byte(Addr addr) {
+  IAsyncReadWritePort(){}
+  MemoryOperation read_byte(Addr addr, uint32_t upstream_id = 0) {
     // std::cout << "read_byte" << std::endl;
-    return MemoryOperation{addr, 0, MemoryOperation::READ_BYTE, *this};
+    return MemoryOperation{addr, 0, MemoryOperation::READ_BYTE, *this, upstream_id};
   }
-  MemoryOperation read_halfword(Addr addr) {
+  MemoryOperation read_halfword(Addr addr, uint32_t upstream_id = 0) {
     // std::cout << "read_halfword" << std::endl;
-    return MemoryOperation{addr, 0, MemoryOperation::READ_HALFWORD, *this};
+    return MemoryOperation{addr, 0, MemoryOperation::READ_HALFWORD, *this, upstream_id};
   }
-  MemoryOperation read_word(Addr addr) {
+  MemoryOperation read_word(Addr addr, uint32_t upstream_id = 0) {
     // std::cout << "read_word " << std::hex << addr << std::endl;
-    return MemoryOperation{addr, 0, MemoryOperation::READ_WORD, *this};
+    return MemoryOperation{addr, 0, MemoryOperation::READ_WORD, *this, upstream_id};
   }
-  MemoryOperation write_byte(Addr addr, uint8_t in) {
+  MemoryOperation write_byte(Addr addr, uint8_t in, uint32_t upstream_id = 0) {
     // std::cout << "write_byte" << std::endl;
-    return MemoryOperation{addr, in, MemoryOperation::WRITE_BYTE, *this};
+    return MemoryOperation{addr, in, MemoryOperation::WRITE_BYTE, *this, upstream_id};
   }
-  MemoryOperation write_halfword(Addr addr, uint16_t in) {
+  MemoryOperation write_halfword(Addr addr, uint16_t in, uint32_t upstream_id = 0) {
     // std::cout << "write_halfword" << std::endl;
-    return MemoryOperation{addr, in, MemoryOperation::WRITE_HALFWORD, *this};
+    return MemoryOperation{addr, in, MemoryOperation::WRITE_HALFWORD, *this, upstream_id};
   }
-  MemoryOperation write_word(Addr addr, uint32_t in) {
+  MemoryOperation write_word(Addr addr, uint32_t in, uint32_t upstream_id = 0) {
     // std::cout << "write_word " << std::hex << addr << ":" << in <<  std::endl;
-    return MemoryOperation{addr, in, MemoryOperation::WRITE_WORD, *this};
+    return MemoryOperation{addr, in, MemoryOperation::WRITE_WORD, *this, upstream_id};
   }
   virtual bool register_op(MemoryOperation &op) = 0;
   // virtual void deregister_op(MemoryOperation &op) = 0;

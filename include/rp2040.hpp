@@ -9,11 +9,14 @@ namespace RP2040 {
 #include "clock.hpp"
 #include "memory_device.hpp"
 #include "reset.hpp"
+#include "rosc.hpp"
 #include <array>
 #include <queue>
 #include <tuple>
 #include "bus.hpp"
+#include "tracing/vcd.hpp"
 #include "rp2040/pad.hpp"
+#include "rp2040/gpio.hpp"
 #include "rp2040/bus/apb.hpp"
 #include "rp2040/bus/ahb.hpp"
 #include "rp2040/bus/ahb_lite.hpp"
@@ -31,7 +34,7 @@ namespace RP2040 {
 
 namespace RP2040{
 
-  class RP2040 final: public IResettable{
+  class RP2040 final: public IResettable, public IClockable{
   public:
     enum IRQ{
       TIMER_IRQ_0 = 0,
@@ -64,11 +67,34 @@ namespace RP2040{
     RP2040();
     virtual void reset() override;
     void run(unsigned int max_ticks);
+    void tick() override;
     void load_binary(const std::string &path);
-    UART &UART0();
+    ARMv6M::ARMv6MCore &core0() { return m_cores[0]; }
+    ARMv6M::ARMv6MCore &core1() { return m_cores[1]; }
+    UART &UART0() {return m_apb.uart0(); }
+    UART &UART1() {return m_apb.uart1(); }
     Bus::APB &APB() { return m_apb; }
     ::RP2040::XIP &XIP() { return m_XIP; }
+    ::RP2040::SSI &SSI() { return m_SSI; }
     Bus::AHBLite &AHBLite() { return m_ahb_lite; }
+    ClockDiv &clk_gpout0() { return clkc_gpout[0]; }
+    ClockDiv &clk_gpout1() { return clkc_gpout[1]; }
+    ClockDiv &clk_gpout2() { return clkc_gpout[2]; }
+    ClockDiv &clk_gpout3() { return clkc_gpout[3]; }
+
+    Net &net(const std::string &name) { 
+      Net *net = std::find_if(
+        m_nets.begin(), 
+        m_nets.end(), 
+        [&name](const Net &net){ 
+          return net.name() == name; 
+        });
+      assert(net != m_nets.end());
+      return *net;
+    }
+
+    Tracing::VCD::Module &vcd() { return m_vcd; }
+    
 
     auto &ROM() { return m_ROM; }
     auto &SRAM0() { return m_SRAM0; }
@@ -84,10 +110,14 @@ namespace RP2040{
   private:
     class IOPort final: public IReadWritePort<uint32_t>{
     public:
-      IOPort(uint32_t cpuid, Core::FiFo &tx_fifo, Core::FiFo &rx_fifo)
+      IOPort(uint32_t cpuid, Core::FiFo &tx_fifo, Core::FiFo &rx_fifo, std::array<std::reference_wrapper<GPIOSignal>, 30> sio, std::array<std::reference_wrapper<GPIOSignal>, 6> sio_hi)
       : m_cpuid{cpuid}
       , m_tx_fifo{tx_fifo}
       , m_rx_fifo{rx_fifo}
+      , m_divider{}
+      , m_spinlocks{}
+      , m_sio{sio}
+      , m_sio_hi{sio_hi}
       {}
       virtual PortState read_byte(uint32_t addr, uint8_t &out) override;
       virtual PortState read_halfword(uint32_t addr, uint16_t &out) override;
@@ -98,14 +128,16 @@ namespace RP2040{
 
     protected:
     private:
-    uint32_t m_cpuid;
-    Core::FiFo &m_tx_fifo, &m_rx_fifo;
-    Core::Divider m_divider;
-    Core::Spinlocks m_spinlocks;
+      uint32_t m_cpuid;
+      Core::FiFo &m_tx_fifo, &m_rx_fifo;
+      Core::Divider m_divider;
+      Core::Spinlocks m_spinlocks;
       // read fifo
       // write fifo
       // spinlocks
       // GPIO
+      std::array<std::reference_wrapper<GPIOSignal>, 30> m_sio;
+      std::array<std::reference_wrapper<GPIOSignal>, 6> m_sio_hi;
     };
     InterruptSourceSet m_interrupts;
     ClockDiv clk_ref, clk_sys, clk_peri, clk_rtc, clk_usb, clk_adc, clkc_gpout[4];
@@ -122,11 +154,12 @@ namespace RP2040{
 
     class CoreBus final : public IAsyncReadWritePort<uint32_t>{
     public:
-      CoreBus(IOPort &ioport, Bus::AHB &ahb)
+      CoreBus(IOPort &ioport, Bus::AHB &ahb, uint32_t id)
       : m_ioport{ioport}
       , m_ahb{ahb}
       , m_op{nullptr}
       , m_runner{bus_task().get_handle()}
+      , m_core_id{id}
       {}
       Awaitable<uint8_t> read_byte_internal(uint32_t addr);
       Awaitable<uint16_t> read_halfword_internal(uint32_t addr);
@@ -136,8 +169,9 @@ namespace RP2040{
       Awaitable<void> write_word_internal(uint32_t addr, uint32_t in);
     protected:
       virtual bool register_op(MemoryOperation &op) override final{
-        // std::cout << "CoreBus Registering op" << std::hex << (uintptr_t)this << ":" << uintptr_t(&op) << std::endl;
+        // std::cout << "CoreBus Registering op" << std::hex << (uintptr_t)this << ":" << uintptr_t(&op) << "(" << m_core_id << ")" << std::endl;
         assert(m_op == nullptr);
+        op.upstream_id = m_core_id;
         m_op = &op;
         if(m_waiting_on_op)
           m_runner.resume();
@@ -179,6 +213,7 @@ namespace RP2040{
     private:
       IOPort &m_ioport;
       Bus::AHB &m_ahb;
+      uint32_t m_core_id;
     };
 
     // keep a list of the Bus Masters
@@ -186,10 +221,16 @@ namespace RP2040{
     // they may be blocked on a memory access.
     // once all tasks are suspended memory access can be performed.
 
+    ROsc m_rosc;
 
     // GPIO Pads
-    Pad m_pads_bank0[30];
+    Pad m_pads_bank0[32];
     Pad m_pads_qspi[6];
+    GPIO m_gpio_bank0[30];// SWDIO,SWCLK have pads but no GPIO connections!
+    GPIO m_gpio_qspi[6];
+    std::array<Net, 38> m_nets;
+    std::array<GPIOSignal, 30> m_sio;
+    std::array<GPIOSignal, 6> m_sio_hi;
 
     // APB Peripherals
     Resets m_resets;
@@ -199,7 +240,7 @@ namespace RP2040{
 
     // AHB Peripherals
     ::RP2040::XIP m_XIP;
-    SSI m_SSI;
+    ::RP2040::SSI m_SSI;
 
     // IOPORT Peripherals
     Core::FiFo m_fifo_01, m_fifo_10;
@@ -212,5 +253,7 @@ namespace RP2040{
     CoreBus m_core_bus[2];
     ARMv6M::ARMv6MCore m_cores[2];
     uint64_t m_tickcnt;
+
+    Tracing::VCD::Module m_vcd;
   };
 }

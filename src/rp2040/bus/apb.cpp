@@ -3,10 +3,13 @@
 
 using namespace RP2040::Bus;
 
+#define _(...)
+
 #define APB_PERIPHERALS(o) \
   o(0x0000'4000, m_syscfg, SYNC, NOTICK) \
   o(0x0000'8000, m_clocks, SYNC, NOTICK) \
   o(0x0000'c000, m_resets, SYNC, NOTICK) \
+  o(0x0001'0000, m_psm, SYNC, NOTICK)\
   o(0x0001'4000, m_io_b0, SYNC, NOTICK) \
   o(0x0001'8000, m_io_qspi, SYNC, NOTICK) \
   o(0x0001'c000, m_pads_b0, SYNC, NOTICK) \
@@ -16,8 +19,13 @@ using namespace RP2040::Bus;
   o(0x0002'c000, m_pll_usb, SYNC, NOTICK) \
   o(0x0003'4000, m_uart0, SYNC, NOTICK) \
   o(0x0003'8000, m_uart1, SYNC, NOTICK) \
+  o(0x0003'c000, m_spi0, SYNC, NOTICK) \
+  o(0x0004'0000, m_spi1, SYNC, NOTICK) \
+  _(0x0004'4000, m_i2c0, SYNC, NOTICK) \
+  _(0x0004'8000, m_i2c1, SYNC, NOTICK) \
   o(0x0005'4000, m_timer, SYNC, NOTICK) \
   o(0x0005'8000, m_watchdog, SYNC, NOTICK) \
+  o(0x0005'c000, m_rtc, SYNC, NOTICK) \
   o(0x0006'4000, m_vreg, SYNC, NOTICK) \
   o(0x0006'c000, m_tbman, SYNC, NOTICK) \
 

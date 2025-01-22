@@ -35,8 +35,9 @@ public:
   }
   virtual size_t count() const override { return m_count; }
   virtual bool empty() const override { return m_count == 0; }
-  virtual bool full() const override { return enabled()?(m_count == N):m_count; }
+  virtual bool full() const override { return enabled()?(m_count == size()):m_count; }
   virtual size_t size() const override { return N; }
+  virtual void clear() { m_head = 0; m_count = 0; }
 
   /**
    * When enabled, the FiFo behaves normally.
@@ -49,7 +50,7 @@ protected:
   void push_internal(T t) {
     assert (!full());
     if (enabled()){
-      m_data[(m_head + m_count++) % N] = t;
+      m_data[(m_head + m_count++) % size()] = t;
     } else {
       m_data[m_head] = t;
       m_count = 1;
@@ -59,7 +60,7 @@ protected:
     assert (!empty());
     if (enabled()){
       T t = m_data[m_head];
-      m_head = (m_head + 1) % N;
+      m_head = (m_head + 1) % size();
       m_count--;
       return t;
     } else {
@@ -80,7 +81,7 @@ class FiFo final : public FiFoBase<T, N> {
 };
 
 template<class T, size_t N>
-class DReqTxFiFo final : public FiFoBase<T, N>, private RP2040::DMA::DReqSource{
+class DReqTxFiFoBase : public FiFoBase<T, N>, private RP2040::DMA::DReqSource{
 public:
   DReqSource &dreq() { return *this; }
   virtual T pop() override {
@@ -91,11 +92,14 @@ public:
 protected:
 private:
   void sync() override final {
-    dreq() += N-count();
+    dreq() += this->size()-count();
   }
 };
 template<class T, size_t N>
-class DReqRxFiFo final : public FiFoBase<T, N>, private RP2040::DMA::DReqSource{
+class DReqTxFiFo final : public DReqTxFiFoBase<T, N> {
+};
+template<class T, size_t N>
+class DReqRxFiFoBase : public FiFoBase<T, N>, private RP2040::DMA::DReqSource{
 public:
   DReqSource &dreq() { return *this; }
   virtual void push(T t) override {
@@ -105,6 +109,9 @@ public:
 protected:
 private:
   void sync() override final {
-    dreq() += N-count();
+    dreq() += this->size()-count();
   }
+};
+template<class T, size_t N>
+class DReqRxFiFo final : public DReqRxFiFoBase<T, N> {
 };

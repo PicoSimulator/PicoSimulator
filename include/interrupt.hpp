@@ -72,12 +72,17 @@ public:
   {
     m_name = name;
   }
+  operator bool() const
+  {
+    return m_raised_bit;
+  }
 protected:
 private:
   std::string m_name;
   std::bitset<32>::reference m_raised_bit;
   InterruptSink &m_sink;
 };
+
 
 class InterruptSourceMulti final : private InterruptSink{
 public:
@@ -109,12 +114,28 @@ public:
   {
     return m_irq_mask.to_ulong();
   }
+  uint32_t masked() const {
+    return m_masked_irq_status.to_ulong();
+  }
 
+  uint32_t raw() const
+  {
+    return m_raw_irq_status.to_ulong();
+  }
+
+  void force(uint32_t force)
+  {
+    m_masked_irq_status |= force;
+    check();
+  }
 
 protected:
 private:
   virtual void update() override final {
     m_masked_irq_status = m_raw_irq_status & m_irq_mask;
+    check();
+  }
+  void check() {
     if (m_masked_irq_status.any())
       m_source.raise();
     else 

@@ -4,14 +4,21 @@ project(PicoSim)
 # GoogleTest requires at least C++14
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-add_compile_options(-ggdb -g -O3)
+add_compile_options(-ggdb -g -O3 -std=c++20)
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 # using Clang
   add_compile_options(-gdwarf-4)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   # using GCC
   add_compile_options(-flto -fcoroutines)
-  add_link_options(-flto -O3)
+  if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-ggdb)
+    add_link_options(-ggdb)
+  else()
+    add_compile_options(-O3)
+    add_link_options(-ggdb)
+    endif()
+  add_link_options(-flto)
 endif()
 
 set(TARGET picosim)

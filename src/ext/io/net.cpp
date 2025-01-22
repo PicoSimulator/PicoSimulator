@@ -1,21 +1,34 @@
 #include "ext/io/net.hpp"
 
+#include <iostream>
+
+Net::Net(const std::string &name)
+  : m_name{name}
+  , m_state{name, false}
+{}
+
 void Net::update(){
+  bool old_state = m_state;
+  bool new_state = m_state;
   uint8_t drive_strength = 0;
   for (auto &c : m_connections){
     if(c->get_drive_strength() <= drive_strength)
       continue;
     drive_strength = c->get_drive_strength();
-    m_state = c->get_drive_value();
+    new_state = c->get_drive_value();
   }
- 
-  for(auto &c : m_connections){
-    c->net_state_changed();
+  if (old_state != new_state) {
+    m_state = new_state;
+    // std::cerr << "Net " << m_name << " changed to " << m_state << std::endl;
+    for(auto &c : m_connections){
+      c->net_state_changed();
+    }
   }
 }
 
 void Net::add_connection(NetConnection *conn){
   m_connections.push_back(conn);
+  update();
 }
 
 void Net::remove_connection(NetConnection *conn){
@@ -25,6 +38,7 @@ void Net::remove_connection(NetConnection *conn){
       return;
     }
   }
+  update();
 }
 
 void NetConnection::connect_to_net(Net *net){
@@ -38,9 +52,6 @@ bool NetConnection::is_connected() const{
   return m_connected_net != nullptr;
 }
 
-Net *NetConnection::connected_net(){
-  return m_connected_net;
-}
 
 uint8_t NetConnection::get_drive_strength() const{
   return m_drive_strength;

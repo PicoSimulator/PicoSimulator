@@ -6,57 +6,72 @@ using namespace RP2040;
 void XIP::tick() {
   // m_runner.m_handle.resume();
   if (m_stream_ctr && !m_stream_fifo.full()) {
-    m_stream_fifo.push(m_flash[m_stream_addr]);
+    m_stream_fifo.push(flash()[m_stream_addr]);
     m_stream_addr++;
     m_stream_ctr--;
   }
 
 }
 
+#define BYPASS_READ(wordtype, ctype, op) op.return_value(*((ctype*)&flash()[(op.addr&0x00ff'ffff)]))
+
 #define READ(wordtype, ctype, op)                                                                               \
 {                                                                                                               \
   uint32_t set, line_no;                                                                                        \
   uint32_t line_offset;                                                                                         \
   switch((op.addr&0x0f00'0000)) {                                                                                 \
-    case 0x0000'0000:                                                                                           \
-      /*normal cache operation*/                                                                                \
-      /*check for hit, update cache on miss*/                                                                   \
-      m_acc_counter++;                                                                                          \
-      if (cache_set_lookup(op.addr, set, line_no)) {                                                            \
-        m_hit_counter++;                                                                                        \
-        line_offset = set * 16 + line_no*8;                                                                     \
-      } else {                                                                                                  \
-        cache_set_choose_replacement(set, line_no);                                                             \
-        line_offset = set * 16 + line_no*8;                                                                     \
-        std::copy(&m_flash[(op.addr&0x00ff'fff8)] , &m_flash[(op.addr&0x00ff'fff8) + 8], &m_data[line_offset]); \
-        m_cache_tags[set][line_no] = {true, cache_tag_decode(op.addr)};                                         \
-      }                                                                                                         \
-      op.return_value(*((ctype*)&m_data.data()[(line_offset + (op.addr&0x0000'0007))]));                        \
+    case 0x0000'0000:\
+      if (enabled()) {\
+        /*normal cache operation*/                                                                                \
+        /*check for hit, update cache on miss*/                                                                   \
+        m_acc_counter++;                                                                                          \
+        if (cache_set_lookup(op.addr, set, line_no)) {                                                            \
+          m_hit_counter++;                                                                                        \
+          line_offset = set * 16 + line_no*8;                                                                     \
+        } else {                                                                                                  \
+          cache_set_choose_replacement(set, line_no);                                                             \
+          line_offset = set * 16 + line_no*8;                                                                     \
+          std::copy(&flash()[(op.addr&0x00ff'fff8)] , &flash()[(op.addr&0x00ff'fff8) + 8], &m_data[line_offset]); \
+          m_cache_tags[set][line_no] = {true, cache_tag_decode(op.addr)};                                         \
+        }                                                                                                         \
+        op.return_value(*((ctype*)&m_data.data()[(line_offset + (op.addr&0x0000'0007))]));                        \
+      } else { \
+        BYPASS_READ(wordtype, ctype, op); \
+      }\
       break;                                                                                                    \
-    case 0x0100'0000:                                                                                           \
-      /* check for hit, don't update cache on miss */                                                           \
-      m_acc_counter++;                                                                                          \
-      if (cache_set_lookup(op.addr, set, line_no)) {                                                            \
-        m_hit_counter++;                                                                                        \
-        line_offset = set * 16 + line_no*8;                                                                     \
+    case 0x0100'0000:   \
+      if (enabled()) {                                                                                        \
+        /* check for hit, don't update cache on miss */                                                           \
+        m_acc_counter++;                                                                                          \
+        if (cache_set_lookup(op.addr, set, line_no)) {                                                            \
+          m_hit_counter++;                                                                                        \
+          line_offset = set * 16 + line_no*8;                                                                     \
+          op.return_value(*((ctype*)&m_data.data()[(line_offset + (op.addr&0x0000'0007))]));                      \
+        } else {                                                                                                  \
+          /* don't update cache on miss */                                                                        \
+          BYPASS_READ(wordtype, ctype, op);                                    \
+        }     \
+      } else { \
+        BYPASS_READ(wordtype, ctype, op); \
+      }                                                                                                    \
+      break;                                                                                                    \
+    case 0x0200'0000:      \
+      if (enabled()) {\
+        /* don't check for hit, always update cache */                                                            \
+        m_acc_counter++;                                                                                          \
+        set = cache_set_decode(op.addr);                                                                          \
+        cache_set_choose_replacement(set, line_no);                                                               \
+        line_offset = set * 16 + line_no*8;                                                                       \
+        std::copy(&flash()[(op.addr&0x00ff'fff8)] , &flash()[(op.addr&0x00ff'fff8) + 8], &m_data[line_offset]);   \
+        m_cache_tags[set][line_no] = {true, cache_tag_decode(op.addr)};                                           \
         op.return_value(*((ctype*)&m_data.data()[(line_offset + (op.addr&0x0000'0007))]));                      \
-      } else {                                                                                                  \
-        /* don't update cache on miss */                                                                        \
-        op.return_value(*((ctype*)&m_flash.begin()[(op.addr&0x00ff'ffff)]));                                    \
-      }                                                                                                         \
-      break;                                                                                                    \
-    case 0x0200'0000:                                                                                           \
-      /* don't check for hit, always update cache */                                                            \
-      m_acc_counter++;                                                                                          \
-      set = cache_set_decode(op.addr);                                                                          \
-      cache_set_choose_replacement(set, line_no);                                                               \
-      line_offset = set * 16 + line_no*8;                                                                       \
-      std::copy(&m_flash[(op.addr&0x00ff'fff8)] , &m_flash[(op.addr&0x00ff'fff8) + 8], &m_data[line_offset]);   \
-      m_cache_tags[set][line_no] = {true, cache_tag_decode(op.addr)};                                           \
+      } else {\
+        BYPASS_READ(wordtype, ctype, op);\
+      }\
       [[fallthrough]];                                                                                          \
     case 0x0300'0000:                                                                                           \
       /* completely bypass cache */                                                                             \
-      op.return_value(*((ctype*)&m_flash[(op.addr&0x00ff'ffff)]));                                              \
+      BYPASS_READ(wordtype, ctype, op);                                              \
       break;                                                                                                    \
      case 0x0400'0000:                                                                                          \
      {                                                                                                          \
@@ -117,16 +132,26 @@ Task XIP::bus_task(){
         break;
       case MemoryOperation::WRITE_BYTE:
         // m_flash[op.addr] = op.data;
+        std::cout << "XIP::WRITE_BYTE: " << std::hex << op.addr << " " << op.data << std::dec << std::endl;
         op.return_void();
         break;
       case MemoryOperation::WRITE_HALFWORD:
         // *(uint16_t*)&m_flash[op.addr] = op.data;
+        std::cout << "XIP::WRITE_HALFWORD: " << std::hex << op.addr << " " << op.data << std::dec << std::endl;
         op.return_void();
         break;
       case MemoryOperation::WRITE_WORD:
         // *(uint32_t*)&m_flash[op.addr] = op.data;
+        std::cout << "XIP::WRITE_WORD: " << std::hex << op.addr << " " << op.data << std::dec << std::endl;
         if ((op.addr & 0x0f00'0000) ==  0x0800'0000) {
           m_ssi.write_word(op.addr, op.data);
+        } else if ((op.addr & 0xff00'0000) == 0x1400'0000) {
+          switch(op.addr & 0xff) {
+            case 0x04: // FLUSH
+              if (op.data&1)
+                flush();
+              break;
+          }
         }
         op.return_void();
         break;
@@ -231,6 +256,7 @@ void XIP::cache_set_choose_replacement(uint32_t set, uint32_t &line_no) {
 }
 
 void XIP::flush() {
+  std::cout << "XIP::flush" << std::endl;
   for (auto &tag_set : m_cache_tags) {
     for (auto &tag : tag_set) {
       tag = {false, 0};

@@ -11,8 +11,9 @@
 
 class UART final : public IPeripheralPort, public IClockable{
 public:
-  UART(InterruptSource &irq_source)
+  UART(const std::string &name, InterruptSource &irq_source)
   : m_irqs{irq_source}
+  , m_vcd{name}
   {
     m_idiv = 0;
     m_fdiv = 0;
@@ -23,10 +24,18 @@ public:
     m_shift_out_counter = 0;
     m_rx_fifo.enable(false);
     m_tx_fifo.enable(false);
+    m_vcd.add_item(m_status);
+    m_vcd.add_item(m_ibrd);
+    m_vcd.add_item(m_fbrd);
+    m_vcd.add_item(m_control);
+    m_vcd.add_item(m_idiv);
+    m_vcd.add_item(m_fdiv);
+    m_vcd.add_item(m_char_out);
+    m_vcd.add_item(m_char_in);
   }
   void tick() override final
   {
-    if ((m_control & Control::UART_EN) == 0) return;
+    if ((m_control & (int)Control::UART_EN) == 0) return;
     //fractional divider
     if (!m_idiv || (--m_idiv == 0 && m_fdiv > m_fbrd)) {
       m_idiv = m_ibrd;
@@ -42,7 +51,7 @@ public:
   }
   RP2040::DMA::DReqSource &tx_dreq() { return m_tx_fifo.dreq(); }
   RP2040::DMA::DReqSource &rx_dreq() { return m_rx_fifo.dreq(); }
-  enum IRQ{
+  enum class IRQ{
     RIM,
     CTSM,
     DCDM,
@@ -56,12 +65,18 @@ public:
     OE,
   };
 
-  InterruptSource &get_irq(IRQ irq) { return m_irqs[irq]; }
+  InterruptSource &get_irq(IRQ irq) { return m_irqs[(int)irq]; }
+
+  RP2040::GPIOSignal &TX() { return m_tx; }
+  RP2040::GPIOSignal &RX() { return m_rx; }
+  RP2040::GPIOSignal &CTS() { return m_cts; }
+  RP2040::GPIOSignal &RTS() { return m_rts; }
+
+  Tracing::VCD::Module &vcd() { return m_vcd; }
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
     out = 0;
-    // std::cout << "UART READ_WORD: " << std::hex << addr << std::endl;
     switch(addr & 0xff) {
       case UARTDR:
         if (!m_rx_fifo.empty()) {
@@ -94,17 +109,14 @@ protected:
   }
   virtual PortState write_word_internal(uint32_t addr, uint32_t in) override final
   {
-    std::cout << "UART WRITE_WORD: " << std::hex << addr << " " << in << std::endl;
     switch(addr & 0xff) {
       case UARTDR:
         if (!m_tx_fifo.full()) {
           m_tx_fifo.push(in);
-          std::cout << "UART DR: (" << char(in) << ")" << std::endl;
           if (m_tx_fifo.enabled() && m_tx_fifo.FiFoBase::count() == tx_fifo_threshold()) {
             
           }
         } else {
-          std::cout << "UART TX FIFO OVERFLOW!" << std::endl;
         }
         break;
       case UARTRSR: m_status &= ~in; break;
@@ -166,7 +178,6 @@ protected:
       case UARTPCELLID3:
         return 0xb1;
     }
-    std::cout << "UART READ_WORD_PURE: " << std::hex << addr << std::endl;
     assert(false);
   }
 
@@ -197,7 +208,7 @@ private:
 
   };
 
-  enum Control{
+  enum class Control{
     UART_EN = 1<<0,
     SIR_EN = 1<<1,
     SIR_LP = 1<<2,
@@ -215,13 +226,13 @@ private:
   void subtick() {
     // std::cout << "UART_SUBTICK" << std::endl;
     // std::cout << std::bitset<32>{m_control} << std::endl;
-    if (m_control & Control::TX_EN && m_shift_out_counter == 0 && !m_tx_fifo.empty()) {
+    if (m_control & (int)Control::TX_EN && m_shift_out_counter == 0 && !m_tx_fifo.empty()) {
       m_shift_out_counter = wordlength();
-      char c = m_tx_fifo.pop();
+      m_char_out = m_tx_fifo.pop();
       if (m_outfile.is_open()) {
+        char c = m_char_out;
         m_outfile.write(&c, 1);
         m_outfile.flush();
-        std::cout << "UART CHAR SENT: " << c << std::endl;
       }
       if (!m_tx_fifo.enabled() && m_tx_fifo.empty()) {
         // there's only one space when disabled 
@@ -233,12 +244,11 @@ private:
     } else if (m_shift_out_counter > 0) {
       m_shift_out_counter--;
     }
-    if (m_control & Control::RX_EN && m_shift_in_counter == 0) {
+    if (m_control & (int)Control::RX_EN && m_shift_in_counter == 0) {
       m_shift_in_counter = wordlength();
       char c;
       if (m_infile.is_open()) {
         if (m_infile.readsome(&c, 1) == 1) {
-          std::cout << "UART CHAR RECEIVED: " << c << std::endl;
           // check for overrun
           if (!m_rx_fifo.full()) {
             m_rx_fifo.push(c);
@@ -246,17 +256,13 @@ private:
           else{
             get_irq(IRQ::OE).raise();
             m_status |= 1 << 3;
-            std::cout << "UART RX FIFO OVERRUN!" << std::endl;
           }
           if (!m_rx_fifo.enabled() && m_rx_fifo.full()) {
             // again that full check is a bit redundant
             get_irq(IRQ::RX).raise();
           } else if (m_rx_fifo.FiFoBase::count() == rx_fifo_threshold()) {
-            std::cout << "RX irq raised" << std::endl;
             get_irq(IRQ::RX).raise();
           }
-          std::cout << "UART RX FIFO THRESHOLD: " << int(rx_fifo_threshold()) << std::endl;
-          std::cout << "UART RX FIFO COUNT: " << m_rx_fifo.FiFoBase::count() << std::endl;
           m_shift_in_counter = wordlength();
         }
       }
@@ -295,25 +301,30 @@ private:
   DReqTxFiFo<uint32_t, 32> m_tx_fifo;
   DReqRxFiFo<uint32_t, 32> m_rx_fifo;
 
-  uint32_t m_status;
-  uint32_t m_ibrd;
-  uint32_t m_fbrd;
-  uint32_t m_control;
+  Tracing::VCD::Register<uint32_t> m_status{"status"};
+  Tracing::VCD::Register<uint32_t> m_ibrd{"ibrd"};
+  Tracing::VCD::Register<uint32_t> m_fbrd{"fbrd"};
+  Tracing::VCD::Register<uint32_t> m_control{"control"};
+  Tracing::VCD::Module m_vcd;
 
   uint32_t m_lcr_h;
   uint32_t m_lcr_l;
 
-  uint32_t m_idiv;
-  uint32_t m_fdiv;
+  Tracing::VCD::Register<uint32_t> m_idiv{"idiv"};
+  Tracing::VCD::Register<uint32_t> m_fdiv{"fdiv"};
 
   std::ofstream m_outfile;
   std::ifstream m_infile;
 
   uint32_t m_shift_in_counter;
   uint32_t m_shift_out_counter;
+  Tracing::VCD::Register<uint8_t> m_char_out{"cout"};
+  Tracing::VCD::Register<uint8_t> m_char_in{"cin"};
 
   uint32_t m_uartifls;
 
   InterruptSourceMulti m_irqs;
+
+  RP2040::GPIOSignal m_tx, m_rx, m_cts, m_rts;
 
 };

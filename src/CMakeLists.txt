@@ -3,6 +3,8 @@ target_sources(${TARGET} PRIVATE
   rp2040.cpp
   rp2040_bootloader.cpp
   memory_device.cpp
+  simulation.cpp
+  tracing/vcd.cpp
   armv6m/core.cpp
   armv6m/mpu.cpp
   rp2040/bus/apb.cpp
@@ -10,9 +12,11 @@ target_sources(${TARGET} PRIVATE
   rp2040/bus/ahb_lite.cpp
   rp2040/peri/xip.cpp
   rp2040/peri/ssi.cpp
+  rp2040/peri/clocks.cpp
   rp2040/peri/dma/dma.cpp
   rp2040/peri/dma/dreq.cpp
   rp2040/pad.cpp
+  rp2040/gpio.cpp
   ext/io/net.cpp
 )
 

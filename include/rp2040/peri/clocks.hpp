@@ -1,9 +1,28 @@
 #pragma once
 
+namespace RP2040{
+  class RP2040;
+}
+
 #include "rp2040/peripheral.hpp"
+
+#define ENUM_CLOCKS(o) \
+o(CLK_REF, clk_ref) \
+o(CLK_SYS, clk_sys) \
+o(CLK_PERI, clk_peri) \
+o(CLK_USB, clk_usb) \
+o(CLK_ADC, clk_adc) \
+o(CLK_RTC, clk_rtc) \
+o(CLK_GPOUT0, clk_gpout0) \
+o(CLK_GPOUT1, clk_gpout1) \
+o(CLK_GPOUT2, clk_gpout2) \
+o(CLK_GPOUT3, clk_gpout3)
+
+
 
 class Clocks final : public IPeripheralPort{
 public:
+  Clocks(RP2040::RP2040 &rp2040) : m_rp2040{rp2040} {}
 protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
@@ -16,6 +35,8 @@ protected:
       case CLK_SYS_SELECTED: out = m_clk_sys_selected; break; // CLK_SYS_SELECTED
       case CLK_PERI_CTRL: ; break;
       case CLK_PERI_SELECTED: out = 1; break; // CLK_PERI_SELECTED has no glitchless mux
+      case CLK_RTC_CTRL: break;
+      case CLK_RTC_SELECTED: out = 1; break;
     }
     return PortState::SUCCESS;
   }
@@ -40,11 +61,13 @@ protected:
       case CLK_REF_CTRL: m_clk_ref_ctrl = in; m_clk_ref_selected = (1 << (in & 0x03)); break;
       case CLK_SYS_CTRL: m_clk_sys_ctrl = in; m_clk_sys_selected = (1 << (in & 0x01)); break;
       case CLK_PERI_CTRL: ; break;
+      case CLK_RTC_CTRL: ; break;
     }
     return PortState::SUCCESS;
   }
 
 private:
+  ClockDiv &clk_gpout0();
   enum Register{
     CLK_GPOUT0_CTRL = 0x00,
     CLK_GPOUT0_DIV = 0x04,
@@ -105,7 +128,9 @@ private:
   uint32_t m_clk_peri_selected = 1;
 
 
-
+  RP2040::RP2040 &m_rp2040;
 
 
 };
+
+#include "rp2040.hpp"

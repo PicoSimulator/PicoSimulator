@@ -25,11 +25,15 @@ namespace RP2040{
       }
       m_hit_counter = 0;
       m_acc_counter = 0;
+      m_enabled = true;
     }
     void load_binary_data(const std::span<uint8_t> data){
-      std::copy(data.begin(), data.end(), m_flash.begin());
+      std::copy(data.begin(), data.end(), flash().begin());
     }
     virtual void tick() override;
+    const std::span<uint8_t> flash() const { return m_ssi.spidev().flash(); }
+    std::span<uint8_t> flash() { return m_ssi.spidev().flash(); }
+    bool enabled() const { return m_enabled; }
 
   protected:
   private:
@@ -71,7 +75,7 @@ namespace RP2040{
     
     Task bus_task();
     //hack for now to make this work!
-    std::array<uint8_t, 0x0100'0000> m_flash;
+    // std::array<uint8_t, 0x0100'0000> m_flash;
 
 
     std::array<uint8_t, 16384> m_data;
@@ -94,6 +98,7 @@ namespace RP2040{
     SSI &m_ssi;
     std::coroutine_handle<> m_runner;
     MemoryOperation *m_op;
+    bool m_enabled;
   };
 
 }

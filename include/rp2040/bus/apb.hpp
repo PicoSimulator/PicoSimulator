@@ -2,6 +2,7 @@
 
 #include "memory_device.hpp"
 #include "rp2040/peri/resets.hpp"
+#include "rp2040/peri/psm.hpp"
 #include "rp2040/peri/vreg.hpp"
 #include "rp2040/peri/clocks.hpp"
 #include "rp2040/peri/syscfg.hpp"
@@ -15,6 +16,9 @@
 #include "rp2040/peri/timer.hpp"
 #include "rp2040/peri/pll.hpp"
 #include "rp2040/peri/uart.hpp"
+#include "rp2040/peri/spi.hpp"
+#include "rp2040/peri/i2c.hpp"
+#include "rp2040/peri/rtc.hpp"
 #include "rp2040/peri/dma/dreq.hpp"
 #include "async.hpp"
 
@@ -30,18 +34,32 @@ namespace RP2040::Bus{
       VReg &vreg,
       Clocks &clocks,
       SysCfg &syscfg,
+      std::array<std::reference_wrapper<GPIO>, 30> bank0_gpios,
+      std::array<std::reference_wrapper<GPIO>, 6> qspi_gpios,
       std::array<std::reference_wrapper<InterruptSource>, 4> timer_irqs,
       InterruptSource &uart0_irq,
-      InterruptSource &uart1_irq
+      InterruptSource &uart1_irq,
+      InterruptSource &spi0_irq,
+      InterruptSource &spi1_irq,
+      InterruptSource &i2c0_irq,
+      InterruptSource &i2c1_irq,
+      InterruptSource &rtc_irq
     ) 
     : m_runner{bus_task().get_handle()}
     , m_resets{resets}
     , m_vreg{vreg}
     , m_clocks{clocks}
     , m_syscfg{syscfg}
-    , m_uart0{uart0_irq}
-    , m_uart1{uart1_irq}
+    , m_io_b0{bank0_gpios}
+    , m_io_qspi{qspi_gpios}
+    , m_uart0{"UART0", uart0_irq}
+    , m_uart1{"UART1", uart1_irq}
+    , m_spi0{spi0_irq}
+    , m_spi1{spi1_irq}
     , m_timer{timer_irqs}
+    , m_i2c0{i2c0_irq}
+    , m_i2c1{i2c1_irq}
+    , m_rtc{rtc_irq}
     {}
     virtual void tick() override;
     Awaitable<uint8_t> read_byte_internal(uint32_t addr);
@@ -54,6 +72,12 @@ namespace RP2040::Bus{
     Timer &timer() { return m_timer; }
     UART &uart0() { return m_uart0; }
     UART &uart1() { return m_uart1; }
+    SPI &spi0() { return m_spi0; }
+    SPI &spi1() { return m_spi1; }
+    I2C &i2c0() { return m_i2c0; }
+    I2C &i2c1() { return m_i2c1; }
+    IOQSPI &io_qspi() { return m_io_qspi; }
+    RTC &rtc() { return m_rtc; }
   protected:
     virtual bool register_op(MemoryOperation &op) override final{
       // std::cout << "APB register " << uintptr_t(&op) << std::endl;
@@ -103,6 +127,7 @@ namespace RP2040::Bus{
     // WDT
     // RTC
     Resets &m_resets;
+    PoweronStateMachine m_psm;
     VReg &m_vreg;
     Clocks &m_clocks;
     SysCfg &m_syscfg;
@@ -116,5 +141,8 @@ namespace RP2040::Bus{
     Timer m_timer;
     PLL m_pll_sys, m_pll_usb;
     UART m_uart0, m_uart1;
+    SPI m_spi0, m_spi1;
+    I2C m_i2c0, m_i2c1;
+    RTC m_rtc;
   };
 }

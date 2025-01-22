@@ -1,5 +1,7 @@
 #pragma once
 
+#include "rp2040/gpio.hpp"
+
 namespace RP2040{
   // class SSI;
   // class SSIFiFoAux;
@@ -22,10 +24,19 @@ namespace RP2040{
   public:
     SSI(RP2040 &rp2040) 
     : m_rp2040{rp2040}
-    {}
+    {
+      m_ss.set_oe(true);
+      m_ss.set_output(true);
+    }
     virtual ~SSI() {};
     virtual void tick() override;
     W25QFlash &spidev() { return m_spidev; }
+    GPIOSignal &SCK() { return m_sck; }
+    GPIOSignal &SS() { return m_ss; }
+    GPIOSignal &D0() { return m_d0; }
+    GPIOSignal &D1() { return m_d1; }
+    GPIOSignal &D2() { return m_d2; }
+    GPIOSignal &D3() { return m_d3; }
   protected:
     virtual PortState read_word_internal(uint32_t addr, uint32_t &out) final override;
     virtual PortState write_word_internal(uint32_t addr, uint32_t in) final override;
@@ -84,6 +95,9 @@ namespace RP2040{
       SPI_CTRLR0 = 0xf4,
       TXD_DRIVE_EDGE = 0xf8,
     };
+  
+    GPIOSignal m_sck, m_ss, m_d0, m_d1, m_d2, m_d3;
+
   };
 
 }

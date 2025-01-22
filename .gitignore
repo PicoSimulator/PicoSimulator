@@ -1,3 +1,10 @@
 build*
 .vscode/
 .VSCodeCounter/
+divider.py
+.gitignore
+dsl/
+callgrind.*
+*.vcd
+boards/
+schema/

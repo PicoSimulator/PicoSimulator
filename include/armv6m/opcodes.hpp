@@ -661,9 +661,11 @@
       })\
     } break;\
     case 0x0140'0000: \
+    case 0x0180'0000: \
+    case 0x01c0'0000: \
     {\
       uint32_t Rm = (opcode >> 19) & 0xf;\
-      uint32_t Rn = (opcode >> 16) & 0x7 | (opcode >> 19) & 0x8;\
+      uint32_t Rn = (opcode >> 16) & 0x7 | (opcode >> 20) & 0x8;\
       do_disasm({\
         std::cout << FMT_op16(opcode) \
                   << FMT_dis_RdnRm("CMP", Rn, Rm) \
@@ -683,7 +685,8 @@
         })\
       })\
     } break;\
-    default: throw HardFault{}; \
+    \
+    default: throw HardFault{"undefined special opcode?"}; \
   }\
 }
 
@@ -1137,9 +1140,9 @@
         })\
       } break;\
       case 0x0080'0000: {\
-        /* do_disam({\
-          std::cout << "SUB SP, #" << FMT_dec(imm32) << std::endl;\
-        }) */\
+        do_disasm({\
+          std::cout << FMT_op16(opcode) << "SUB SP, #" << FMT_dec(imm32) << std::endl;\
+        })\
         do_exec({\
           uint32_t imm32 = (opcode >> 14) & 0x1fc;\
           auto _res = AddWithCarry(SP(), ~imm32, 1);\
@@ -1371,10 +1374,12 @@
           case 0b0001: /*YIELD*/ \
             break;\
           case 0b0010: /*WFE*/ \
-            while (!EventRegistered()) co_await next_tick();\
+            std::cout << "WFE" << std::endl;\
+            while (!EventRegistered() && nvic().check_pending() == NVIC::ExceptionNumber::NONE) co_await next_tick();\
             ClearEventRegister();\
             break;\
           case 0b0011: /*WFI*/ \
+            std::cout << "WFI" << std::endl;\
             while (!EventRegistered()) co_await next_tick();\
             ClearEventRegister();\
             break;\
@@ -1603,6 +1608,9 @@
       uint32_t I1 = (opcode >> 13) &1;\
       uint32_t I2 = (opcode >> 11) &1;\
       uint32_t imm32 = ((imm11 << 1) | (imm10 << 12) | (I2 << 22) | (I1 << 23)) - (1<<24);\
+      do_disasm({\
+        std::cout << FMT_op32(opcode) << "BL " << FMT_hexw(imm32, 8) << std::endl;\
+      })\
       do_exec({\
         uint32_t addr = m_nextPC + imm32;\
         do_trace({\
