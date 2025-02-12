@@ -1,0 +1,47 @@
+on: 
+  push:
+    branches:
+      - main
+  workflow_dispatch: # This allows you to run the workflow manually
+    inputs: 
+      reason: 
+        description: 'Reason for updating public repo'
+        required: true
+        type: string
+
+name: Make Public
+jobs: 
+  make_public:
+    runs-on: ubuntu-latest
+    env:
+      PRIVATE_PATH: ${{github.workspace}}/private_repo
+      PUBLIC_PATH: ${{github.workspace}}/public_repo
+      COMMIT_MSG: ${{ github.event.inputs.reason || github.event.head_commit.message || 'Update public repo' }}
+
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v2
+        with:
+          path: ${{ env.PRIVATE_PATH }}
+      - name: Checkout public repo
+        uses: actions/checkout@v2
+        with:
+          repository: PicoSimulator/PicoSimulator
+          path: ${{ ENV.PUBLIC_PATH }}
+      - name: Copy files
+        run: |
+          cp ${{ENV.PRIVATE_PATH}}/README.md ${{ENV.PUBLIC_PATH}}/README.md
+      - name: git config
+        run: |
+          git -C ${{ENV.PUBLIC_PATH}} config user.email "skyler.mansfield.21@gmail.com"
+          git -C ${{ENV.PUBLIC_PATH}} config user.name "Skyler Mansfield (Bot)"
+      - name: commit and push if changes
+        run: |
+          eval "$(ssh-agent -s)"
+          ssh-add - <<< "${{ secrets.PUBLIC_REPO_SSH_KEY }}"
+          git -C ${{ENV.PUBLIC_PATH}} remote set-url origin git@github.com:PicoSimulator/PicoSimulator.git
+          git -C ${{ENV.PUBLIC_PATH}} add .
+          git -C ${{ENV.PUBLIC_PATH}} commit -m "${{ env.COMMIT_MSG }}"
+          git -C ${{ENV.PUBLIC_PATH}} push
+        
+
