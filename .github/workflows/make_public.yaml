@@ -28,17 +28,18 @@ jobs:
         with:
           repository: PicoSimulator/PicoSimulator
           path: ${{ ENV.PUBLIC_PATH }}
+          ssh-key: ${{ secrets.PUBLIC_REPO_SSH_KEY }}
       - name: Copy files
         run: |
+          mkdir -p ${{ENV.PUBLIC_PATH}}/.github/workflows/
           cp ${{ENV.PRIVATE_PATH}}/README.md ${{ENV.PUBLIC_PATH}}/README.md
+          cp ${{ENV.PRIVATE_PATH}}/.github/workflows_public/* ${{ENV.PUBLIC_PATH}}/.github/workflows/
       - name: git config
         run: |
           git -C ${{ENV.PUBLIC_PATH}} config user.email "skyler.mansfield.21@gmail.com"
           git -C ${{ENV.PUBLIC_PATH}} config user.name "Skyler Mansfield (Bot)"
       - name: commit and push if changes
         run: |
-          eval "$(ssh-agent -s)"
-          ssh-add - <<< "${{ secrets.PUBLIC_REPO_SSH_KEY }}"
           git -C ${{ENV.PUBLIC_PATH}} remote set-url origin git@github.com:PicoSimulator/PicoSimulator.git
           git -C ${{ENV.PUBLIC_PATH}} add .
           git -C ${{ENV.PUBLIC_PATH}} commit -m "${{ env.COMMIT_MSG }}"

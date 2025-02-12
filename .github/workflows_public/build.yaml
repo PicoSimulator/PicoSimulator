@@ -1,0 +1,38 @@
+on: 
+  push:
+    branches:
+      - main
+  workflow_dispatch: # This allows you to run the workflow manually
+
+name: Build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PRIVATE_PATH: ${{github.workspace}}/private_repo
+      PUBLIC_PATH: ${{github.workspace}}/public_repo
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v2
+        with:
+          repository: PicoSimulator/PicoSimulator-private
+          ssh-key: ${{ secrets.PRIVATE_REPO_SSH_KEY }}  
+          path: ${{ ENV.PRIVATE_PATH }}
+      - name: Install dependencies
+        run: |
+          sudo apt install cmake
+      - name: Build with cmake
+        uses: lukka/run-cmake@v10
+        with: 
+          configurePreset: gcc_release
+      - name: copy build artifacts
+        run: |
+          mkdir -p ${{ENV.PUBLIC_PATH}}/build/
+          cp -r ${{ENV.PRIVATE_PATH}}/build/picosim_app ${{ENV.PUBLIC_PATH}}/build
+      - name: upload build artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build
+          path: |
+            ${{ENV.PUBLIC_PATH}}/build/picosim_app
