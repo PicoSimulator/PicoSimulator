@@ -16,6 +16,7 @@ struct MyArgs : public argparse::Args {
   bool &core0_trace = kwarg("core0.trace", "Enable trace for core 0").set_default(false);
   bool &core1_trace = kwarg("core1.trace", "Enable trace for core 1").set_default(false);
   bool &core1_enable = kwarg("core1.enable", "Enable core 1").set_default(false);
+  bool &epd3in7 = kwarg("epd3in7", "Enable Waveshare EPD 3.7in display").set_default(false);
 };
 
 struct Args : public argparse::Args {
@@ -79,16 +80,18 @@ int main(int argc, char** argv)
   sigaction(SIGINT, &sigIntHandler, NULL);
 
   {
+    std::vector<std::unique_ptr<IODevice>> devices;
+    if (args.epd3in7) {
+      std::unique_ptr<IODevice> device = create_device("epdsim:epd3in7");
+      device->get_named_pin("D/~C")->connect_to_net(&g_rp2040.net("GP8"));
+      device->get_named_pin("BUSY")->connect_to_net(&g_rp2040.net("GP13"));
+      device->get_named_pin("~RESET")->connect_to_net(&g_rp2040.net("GP12"));
+      device->get_named_pin("~CS")->connect_to_net(&g_rp2040.net("GP9"));
+      device->get_named_pin("SCLK")->connect_to_net(&g_rp2040.net("GP10"));
+      device->get_named_pin("MOSI")->connect_to_net(&g_rp2040.net("GP11"));
+      devices.push_back(std::move(device));
+    }
     
-    std::unique_ptr<IODevice> device = create_device("epdsim:epd3in7");
-    device->get_named_pin("D/~C")->connect_to_net(&g_rp2040.net("GP8"));
-    device->get_named_pin("BUSY")->connect_to_net(&g_rp2040.net("GP13"));
-    device->get_named_pin("~RESET")->connect_to_net(&g_rp2040.net("GP12"));
-    device->get_named_pin("~CS")->connect_to_net(&g_rp2040.net("GP9"));
-    device->get_named_pin("SCLK")->connect_to_net(&g_rp2040.net("GP10"));
-    device->get_named_pin("MOSI")->connect_to_net(&g_rp2040.net("GP11"));
-    // g_rp2040.SPI0().
-
     g_start_time = std::chrono::high_resolution_clock::now();
     g_rp2040.reset();
     g_rp2040.core0().set_trace_enabled(args.core0_trace);
