@@ -39,6 +39,7 @@ jobs:
           git -C ${{ENV.PUBLIC_PATH}} config user.email "skyler.mansfield.21@gmail.com"
           git -C ${{ENV.PUBLIC_PATH}} config user.name "Skyler Mansfield (Bot)"
       - name: commit and push if changes
+        continue-on-error: true
         run: |
           git -C ${{ENV.PUBLIC_PATH}} remote set-url origin git@github.com:PicoSimulator/PicoSimulator.git
           git -C ${{ENV.PUBLIC_PATH}} add .
