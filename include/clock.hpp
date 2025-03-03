@@ -87,7 +87,30 @@ private:
 
 class ClockPLL : public ClockTransform {
 public:
+  ClockPLL() 
+  : m_vco{*this}
+  , m_feedback{*this} {
+    sink_add(m_feedback);
+  }
   void tick() override;
 private:
-  
+  IClockable &feedback() { return m_feedback; }
+  class PLLVCO : public IClockable {
+  public:
+    PLLVCO(ClockPLL &pll) : m_pll{pll} {}
+    void tick() override {}
+    void tock() override {}
+  private:
+    ClockPLL &m_pll;
+  };
+  class PLLFeedback : public IClockable {
+  public:
+    PLLFeedback(ClockPLL &pll) : m_pll{pll} {}
+    void tick() override {}
+    void tock() override {}
+  private:
+    ClockPLL &m_pll;
+  };
+  PLLVCO m_vco;
+  PLLFeedback m_feedback;
 };

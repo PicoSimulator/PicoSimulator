@@ -23,9 +23,13 @@ endif()
 
 set(TARGET picosim)
 add_library(${TARGET} STATIC)
+target_compile_definitions(${TARGET} PRIVATE
+  config_VCD_TRACE_ENABLED=$CACHE{TRACE_ENABLED}
+)
 target_compile_options(${TARGET} PRIVATE -std=c++20 -fcoroutines)
 target_include_directories(${TARGET} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include/)
 add_subdirectory(src)
 
 add_subdirectory(app)
+add_subdirectory(extlib)
 add_subdirectory(tests)

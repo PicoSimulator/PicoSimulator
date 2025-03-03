@@ -60,7 +60,6 @@ private:
   {
     m_vcd.top().add_item(m_nets);
     m_vcd.top().add_item(m_time);
-    // m_time.disable(); 
   }
   struct Event{
     simulation_time_t time;

@@ -1,6 +1,10 @@
-# PicoSim
+# PicoSimulator
 
-Picosim is designed to be a cycle-accurate full-system emulator for the RP2040/Raspberry Pi Pico and other similar boards. It features (WIP) full crossbar bus fabric simulation with wait-states and stalls and once complete will hopefully be indistinguishable from real hardware to software.
+PicoSimulator (AKA PicoSim) is designed to be a cycle-accurate full-system emulator for the RP2040/Raspberry Pi Pico and other similar boards. It features (WIP) full crossbar bus fabric simulation with wait-states and stalls and once complete will hopefully be indistinguishable from real hardware to software.
+
+## Usage
+
+PicoSim is built as both a library which contains the simulation logic, and an application which parses command line arguments and runs the simulation.
 
 ## Performance considerations
 
@@ -30,9 +34,19 @@ Peripheral configuration is likely to be a one-off event in execution and will b
   - [ ] DMA
   <!-- - [ ]  -->
 
-## Subsystems
+## Peripherals
 
 ### UART
 
 The UART is currently functional enough to provide output from the emulator. You can pass either a file or a PTY using `--uart0=/path/to/file`. This will either write the output of the UART to file or to a PTY of which the other end can be opened by minicom or similar serial port software.
 A PTY pair can be spun up using `socat -d -d pty,rawer,echo=0[,link=/symlink/file0] pty,rawer,echo=0[,link=/symlink/file1]`. Using symlinks allows the path to be consistent, as socat may create pty with any number.
+
+### SPI
+
+### I2C
+
+### PIO
+
+### Timers
+
+### PWM

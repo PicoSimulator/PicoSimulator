@@ -1,0 +1,16 @@
+{
+  "name": "Test config",
+  "elements": {
+    "proc1": {
+      "processor": "rp2040",
+      "flash":{
+        "size": "4MB",
+        "file": "flash.bin",
+        "save": true
+      },
+      "psram":{
+        "size": "8MB"
+      }
+    }
+  }
+}

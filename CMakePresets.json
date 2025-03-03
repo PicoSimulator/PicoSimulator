@@ -6,10 +6,12 @@
       "displayName": "Debug",
       "description": "PicoSim GCC debug",
       "binaryDir": "${sourceDir}/out/build/${presetName}",
+      
       "cacheVariables": {
         "CMAKE_C_COMPILER": "/usr/bin/gcc-13",
         "CMAKE_CXX_COMPILER": "/usr/bin/g++-13",
-        "CMAKE_BUILD_TYPE": "Debug"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "TRACE_ENABLED": "0"
       }
     },
     {
@@ -22,6 +24,37 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
+    },
+    {
+      "name": "gcc_release_tracing",
+      "description": "Tracing enabled",
+      "displayName": "Release with tracing",
+      "inherits": [
+        "gcc_release"
+      ],
+      "cacheVariables": {
+        "TRACE_ENABLED": "1"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "gcc_debug",
+      "description": "",
+      "displayName": "Debug",
+      "configurePreset": "gcc_debug"      
+    },
+    {
+      "name": "gcc_release",
+      "description": "",
+      "displayName": "Release",
+      "configurePreset": "gcc_release"
+    },
+    {
+      "name": "gcc_release_tracing",
+      "description": "Tracing enabled",
+      "displayName": "Release with tracing",
+      "configurePreset": "gcc_release_tracing"
     }
   ]
 }

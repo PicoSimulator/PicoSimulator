@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <cassert>
-#include "rp2040/peri/dma/dreq.hpp"
+#include "platform/rpi/rp2040/peri/dma/dreq.hpp"
 
 template<class T>
 class IFiFo {

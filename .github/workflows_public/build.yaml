@@ -31,8 +31,8 @@ jobs:
           mkdir -p ${{ENV.PUBLIC_PATH}}/build/
           cp -r ${{ENV.PRIVATE_PATH}}/build/picosim_app ${{ENV.PUBLIC_PATH}}/build
       - name: upload build artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: build
+          name: PicoSim Executables
           path: |
             ${{ENV.PUBLIC_PATH}}/build/picosim_app

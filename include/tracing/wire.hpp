@@ -26,6 +26,12 @@ namespace Tracing{
       if(updated)
         this->updated();
     }
+    void set_state(WireState::State state) { 
+      bool updated = m_state != state;
+      m_state = state; 
+      if(updated)
+        this->updated();
+    }
     bool operator|= (bool state) { return m_state |= state; }
   protected:
     std::ostream &print_state(std::ostream &os) const override {

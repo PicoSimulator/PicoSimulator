@@ -17,17 +17,20 @@ public:
   bool get_drive_value() const;
   virtual void net_state_changed(){}
   void connect_to_net(Net *net);
-protected:
   void set_drive_value(bool value){ m_drive_value = value; }
   void set_drive_strength(uint8_t strength){ m_drive_strength = strength; }
+protected:
 private:
-  Net *m_connected_net;
-  bool m_drive_value;
+  Net *m_connected_net = nullptr;
+  bool m_drive_value = 0;
   // drive strength is measured logarithmically
-  // 0 is the weakest, essentially unconnected (100Mohm)
+  // 0 is 100Mohm, treated as high impedance
   // 127 is the default (10Kohm)
   // 255 is the strongest (1ohm)
-  uint8_t m_drive_strength;
+  uint8_t m_drive_strength = 0;
+  // metadata allows us to optimise certain device interfaces
+  // e.g. SPI devices can be optimised if the correct pins are connected
+  // if we see SCLK, check if MOSI or MISO are connected
 };
 
 class Net final{

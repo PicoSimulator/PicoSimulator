@@ -24,6 +24,9 @@ void Net::update(){
       c->net_state_changed();
     }
   }
+  if (drive_strength == 0) {
+    m_state.set_state(Tracing::WireState::Z);
+  }
 }
 
 void Net::add_connection(NetConnection *conn){
@@ -42,6 +45,8 @@ void Net::remove_connection(NetConnection *conn){
 }
 
 void NetConnection::connect_to_net(Net *net){
+  if (this == nullptr)
+    return;
   if (m_connected_net)
     m_connected_net->remove_connection(this);
   m_connected_net = net;

@@ -6,13 +6,24 @@
 #include <iomanip>
 
 #include "net.hpp"
+#include "device.hpp"
 
 #define SEND_BUFFER_MAX 1024
 
-class SPIDev {
+class SPIDev : public IODevice {
 public:
   SPIDev()
-  : m_cs_pin{*this} {}
+  : IODevice()
+  , m_cs_pin{*this} 
+  , m_sclk_pin{*this}
+  {
+    add_named_pin("~CS", m_cs_pin);
+    add_named_pin("SCLK", m_sclk_pin);
+    add_named_pin("MOSI", m_mosi_pin);
+    add_named_pin("MISO", m_miso_pin);
+    m_send_buffer_index = 0;
+    m_send_buffer_len = 0;
+  }
   NetConnection &cs_pin() { return m_cs_pin; }
 
   virtual void spi_cs_changed(bool cs) = 0;
@@ -20,14 +31,25 @@ public:
 
   uint8_t spi_exchange_bit(uint8_t in)
   {
+    // std::cerr << "spi_exchange_bit: "  << int(in) << std::endl;
     if (m_shiftpos <= 0) {
       if (m_send_buffer_index < m_send_buffer_len)
         m_sr_out = m_send_buffer[m_send_buffer_index];
       m_shiftpos = s_shiftcnt_bits;
     }
+    uint8_t ret = spi_peek_bit();
+    spi_advance_bit(in);
+    return ret;
+  }
+  uint8_t spi_peek_bit()
+  {
+    return m_sr_out & 0x80;
+  }
+
+  void spi_advance_bit(uint8_t in)
+  {
     m_sr_in <<= 1;
     m_sr_in |= in;
-    uint8_t ret = m_sr_out & 0x80;
     m_sr_out <<= 1;
     m_shiftpos--;
     if (m_shiftpos == 0) {
@@ -39,7 +61,6 @@ public:
         }
       }
     }
-    return ret;
   }
 
   uint8_t spi_dual_read_bits()
@@ -81,7 +102,7 @@ public:
 
   uint8_t spi_exchange_byte(uint8_t in)
   {
-    std::cout << "spi_exchange_byte: " << std::hex << std::setw(2) << std::setfill('0')  << int(in) << std::dec << std::endl;
+    std::cerr << "spi_exchange_byte: " << std::hex << std::setw(2) << std::setfill('0')  << int(in) << std::dec << std::endl;
     uint8_t out = 0;
     if (m_send_buffer_index < m_send_buffer_len) {
       out = m_send_buffer[m_send_buffer_index];
@@ -112,7 +133,6 @@ public:
 
   void set_cs(bool cs) 
   {
-    std::cout << "set_cs: " << cs << std::endl;
     if (m_cs != cs) {
       m_cs = cs;
       m_shiftpos = s_shiftcnt_bits;
@@ -147,6 +167,8 @@ protected:
   }
   
   bool spi_cs() const { return m_cs; }
+
+  void set_miso_enabled(bool en) {} 
 private:
   uint8_t m_send_buffer[SEND_BUFFER_MAX];
   size_t m_send_buffer_len;
@@ -155,18 +177,59 @@ private:
   uint8_t m_sr_in, m_sr_out;
   uint8_t m_shiftpos;
 
-  static constexpr size_t s_shiftcnt_bits = 7;
+  static constexpr size_t s_shiftcnt_bits = 8;
 
   class CS_Pin final : public NetConnection{
   public:
     CS_Pin(SPIDev &dev) : m_dev{dev}{}
     void net_state_changed() override{
       bool val = connected_net()->digital_read();
-      // std::cerr << "CS_Pin::net_state_changed cs=" << val << "\n";
       m_dev.set_cs(val);
+      m_dev.m_miso_pin.set_drive_strength(val?0:255);
+      m_dev.m_miso_pin.set_drive_value(m_dev.spi_peek_bit());
     }
   protected:
   private:
     SPIDev &m_dev;
   } m_cs_pin;
+  class SCLK_Pin final : public NetConnection{
+  public:
+    SCLK_Pin(SPIDev &dev) 
+    : m_dev{dev}
+    , m_prev_val{false}
+    {}
+    void net_state_changed() override{
+      if (m_dev.spi_cs() == 1)
+        return;
+      bool val = connected_net()->digital_read();
+      bool prev_val = m_prev_val;
+      m_prev_val = val;
+      // no clock transition
+      if (val == prev_val) {
+        return;
+      }
+      if (val ^ m_dev.m_cpol ^ m_dev.m_cpha) {
+        // transition from idle clock state
+        bool bit_in = 0;
+        if (m_dev.m_mosi_pin.is_connected()) {
+          bit_in = m_dev.m_mosi_pin.connected_net()->digital_read();
+        }
+        m_bit_out = m_dev.spi_exchange_bit(bit_in);
+      } else {
+        // transition to idle clock state
+        m_dev.m_miso_pin.set_drive_value(m_bit_out);
+        // no transition
+        return;
+      }
+    }
+  protected:
+  private:
+    bool m_prev_val;
+    bool m_bit_out;
+    SPIDev &m_dev;
+  } m_sclk_pin;
+  NetConnection m_mosi_pin;
+  NetConnection m_miso_pin;
+  bool m_cpol;
+  bool m_cpha;
 };

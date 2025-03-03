@@ -47,7 +47,7 @@ namespace Tracing::VCD{
     void enable() {
       m_file = m_file_internal;
     }
-    void disable() {
+    virtual void disable() {
       m_file = nullptr;
     }
     virtual void dump() = 0;
@@ -81,6 +81,12 @@ namespace Tracing::VCD{
       }
     }
     Item &get(const std::string &key);
+    void disable() override {
+      Item::disable();
+      for(auto &i : m_items){
+        i.get().disable();
+      }
+    }
   protected:
     void id_updated() override {
       int cnt = 0;
