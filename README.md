@@ -66,3 +66,7 @@ SPI is mostly functional. External devices can be connected to either hardware S
 ## Device Loading
 
 Devices can be loaded using shared-object/dll type libraries. These provide a standard factory interface which takes a device name and returns a unique_ptr to `IODevice`. This class is responsible for encapsulating devices with Pins or Connections to the real world. These `NetConnection`s are given names and can be looked up to connect to other Nets. In the future I hope to add metadata to these connections allowing the Net simulation to be bypassed entirely in favour of function pointer handling.
+
+## Tracing
+
+PicoSim can be built with Tracing enabled. This allows complete visibility of the internal state of the emulator through time, along with the state of pins and connections allowing simplified debugging of devices. Performance is significantly degraded when this is enabled so this feature is provid as a separate build. Individual groups or Modules can be enabled/disabled as needed, disabling unwanted signals will speed up emulation.
