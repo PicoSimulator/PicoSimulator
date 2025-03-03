@@ -16,22 +16,32 @@ Peripheral configuration is likely to be a one-off event in execution and will b
 
 - [ ] RP2040 Processor
   - [ ] Clocks
-  - [ ] ARMv6M Core
-  - [ ] Bus Fabric
-    - [ ] AHB Crossbar
-    - [ ] AHB-Lite Splitter
-    - [ ] APB Bridge+splitter
+    - [ ] PLLs
+    - [x] Clock MUXes
+    - [x] Clock Dividers
+  - [x] ARMv6M Core
+  - [x] Bus Fabric
+    - [x] AHB Crossbar
+    - [x] AHB-Lite Splitter
+    - [x] APB Bridge+splitter
   - [ ] IOPort SIO
-    - [ ] CPUID
-    - [ ] FIFOs
+    - [x] CPUID
+    - [x] FIFOs
     - [ ] Spinlocks
     - [ ] Integer Divider
     - [ ] Interpolator
-    - [ ] SIO GPIO
-  - [ ] Interrupts
-    - [ ] NVIC
-  - [ ] Event Signals
-  - [ ] DMA
+    - [x] SIO GPIO
+  - [x] Interrupts
+    - [x] NVIC
+  - [x] Event Signals
+  - [x] DMA
+  - [ ] Peripherals
+    - [x] UART
+    - [x] SPI
+    - [ ] I2C
+    - [ ] PWM
+    - [ ] ADC
+    - [ ] PIO
   <!-- - [ ]  -->
 
 ## Peripherals
@@ -43,6 +53,8 @@ A PTY pair can be spun up using `socat -d -d pty,rawer,echo=0[,link=/symlink/fil
 
 ### SPI
 
+SPI is mostly functional. External devices can be connected to either hardware SPI interface or bitbanged pins. These external devices can be built-in or loaded from shared libraries.
+
 ### I2C
 
 ### PIO
@@ -50,3 +62,7 @@ A PTY pair can be spun up using `socat -d -d pty,rawer,echo=0[,link=/symlink/fil
 ### Timers
 
 ### PWM
+
+## Device Loading
+
+Devices can be loaded using shared-object/dll type libraries. These provide a standard factory interface which takes a device name and returns a unique_ptr to `IODevice`. This class is responsible for encapsulating devices with Pins or Connections to the real world. These `NetConnection`s are given names and can be looked up to connect to other Nets. In the future I hope to add metadata to these connections allowing the Net simulation to be bypassed entirely in favour of function pointer handling.
