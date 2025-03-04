@@ -151,6 +151,12 @@ Task XIP::bus_task(){
               if (op.data&1)
                 flush();
               break;
+            case 0x0c: // CTR_HIT
+              m_hit_counter = 0;
+              break;
+            case 0x10: // CTR_ACC
+              m_acc_counter = 0;
+              break;
           }
         }
         op.return_void();
