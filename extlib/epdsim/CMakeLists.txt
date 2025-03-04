@@ -14,4 +14,4 @@ aux_source_directory(. DIR_epdsim_SRCS)
 # Generate the link library
 add_library(epdsim SHARED ${DIR_epdsim_SRCS})
 
-target_link_libraries(epdsim PRIVATE picosim sfml-graphics sfml-window sfml-system X11)
+target_link_libraries(epdsim PRIVATE picosim sfml-graphics sfml-window sfml-system)
