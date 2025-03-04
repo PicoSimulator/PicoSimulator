@@ -158,6 +158,13 @@ Task XIP::bus_task(){
               m_acc_counter = 0;
               break;
           }
+        } else if ((op.addr & 0xff00'0000) == 0x1000'0000) {
+          uint32_t set, line_no;
+          uint32_t line_offset; 
+          if (cache_set_lookup(op.addr, set, line_no)) {
+            auto &[valid, line_tag] = m_cache_tags[set][line_no];
+            valid = 0;
+          } 
         }
         op.return_void();
         break;
