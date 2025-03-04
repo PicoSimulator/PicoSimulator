@@ -37,6 +37,7 @@ jobs:
       - name: upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: PicoSim Executables
+          name: PicoSim Release Executables
           path: |
-            ${{ENV.PUBLIC_PATH}}/build/picosim_app
+            ${{ENV.PUBLIC_PATH}}/out/build/gcc_release/picosim_app
+            ${{ENV.PUBLIC_PATH}}/out/build/gcc_release/extlib/epdsim/libepdsim.so

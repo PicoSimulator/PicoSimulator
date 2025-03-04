@@ -34,6 +34,7 @@ jobs:
           mkdir -p ${{ENV.PUBLIC_PATH}}/.github/workflows/
           cp ${{ENV.PRIVATE_PATH}}/README.md ${{ENV.PUBLIC_PATH}}/README.md
           cp ${{ENV.PRIVATE_PATH}}/.github/workflows_public/* ${{ENV.PUBLIC_PATH}}/.github/workflows/
+          git rev-parse HEAD > ${{ENV.PUBLIC_PATH}}/git_hash
       - name: git config
         run: |
           git -C ${{ENV.PUBLIC_PATH}} config user.email "skyler.mansfield.21@gmail.com"
