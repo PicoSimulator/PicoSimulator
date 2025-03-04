@@ -26,6 +26,7 @@ jobs:
         uses: lukka/run-cmake@v10
         with: 
           configurePreset: gcc_release
+          cmakeListsTxtPath: ${{ENV.PRIVATE_PATH}}/CMakeLists.txt
       - name: copy build artifacts
         run: |
           mkdir -p ${{ENV.PUBLIC_PATH}}/build/
