@@ -37,7 +37,7 @@ void simulation_complete(){
   std::cerr << "Run for " << std::dec << sim.current_time() << " simulation ticks" << std::endl;
   std::cerr << "Run for " << elapsed_seconds.count() << " seconds" << std::endl;
   std::cerr << "Emulation speed " << g_rp2040.tickcnt()/elapsed_seconds.count()/1000'000.0 << " MHz" << std::endl;
-  std::cerr << "Simulation ran at " << sim.current_time() / sim.from_seconds(1) / elapsed_seconds.count() *100 << "% real time" << std::endl;
+  std::cerr << "Simulation ran at " << sim.current_time() / elapsed_seconds.count() / sim.from_seconds(1) * 100.0 << "% real time" << std::endl;
   std::cerr << "EXITING" << std::endl;
   sim.abort();
 }
