@@ -12,11 +12,11 @@
 struct MyArgs : public argparse::Args {
   std::string &binary = arg("flash_binary", "Path to binary file to load into flash");
   std::optional<std::string> &uart0 = kwarg("uart0", "Path to UART0 file, can be PTY");
-  unsigned long long &max_ticks = kwarg("max_ticks", "Number of ticks to run").set_default(std::numeric_limits<unsigned int>::max());
+  unsigned long long &max_ticks = kwarg("max_ticks", "Number of ticks to run").set_default(std::numeric_limits<unsigned long long>::max());
   bool &core0_trace = kwarg("core0.trace", "Enable trace for core 0").set_default(false);
   bool &core1_trace = kwarg("core1.trace", "Enable trace for core 1").set_default(false);
   bool &core1_enable = kwarg("core1.enable", "Enable core 1").set_default(false);
-  bool &epd3in7 = kwarg("epd3in7", "Enable Waveshare EPD 3.7in display").set_default(false);
+  bool &epd3in7 = flag("epd3in7", "Enable Waveshare EPD 3.7in display");
 };
 
 struct Args : public argparse::Args {
