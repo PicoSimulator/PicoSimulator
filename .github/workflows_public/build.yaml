@@ -21,8 +21,20 @@ jobs:
           path: ${{ ENV.PRIVATE_PATH }}
           submodules: true
       - name: Install dependencies
-        run: |
-          sudo apt install cmake
+        uses: daaku/gh-action-apt-install@v4
+        with:
+          packages: |
+            cmake     
+            libxrandr-dev
+            libxcursor-dev
+            libudev-dev
+            libopenal-dev
+            libflac-dev
+            libvorbis-dev
+            libgl1-mesa-dev
+            libegl1-mesa-dev
+            libdrm-dev
+            libgbm-dev
       - name: Build with cmake
         uses: lukka/run-cmake@v10
         with: 
