@@ -32,7 +32,7 @@ jobs:
           cmakeListsTxtPath: ${{ENV.PRIVATE_PATH}}/CMakeLists.txt
           configurePreset: gcc_release
           buildPreset: gcc_release
-          configurePresetAdditionalArgs: ['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']
+          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: copy build artifacts
         run: |
           mkdir -p ${{ENV.PUBLIC_PATH}}/build/
