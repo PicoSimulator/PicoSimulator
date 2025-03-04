@@ -27,7 +27,7 @@ Peripheral configuration is likely to be a one-off event in execution and will b
   - [ ] IOPort SIO
     - [x] CPUID
     - [x] FIFOs
-    - [ ] Spinlocks
+    - [x] Spinlocks
     - [ ] Integer Divider
     - [ ] Interpolator
     - [x] SIO GPIO
