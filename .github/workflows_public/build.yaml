@@ -41,4 +41,4 @@ jobs:
           name: PicoSim Release Executables
           path: |
             ${{ENV.PUBLIC_PATH}}/build/picosim_app
-            ${{ENV.PUBLIC_PATH}}/build/extlib/epdsim/libepdsim.so
+            ${{ENV.PUBLIC_PATH}}/build/libepdsim.so
