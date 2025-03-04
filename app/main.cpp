@@ -33,11 +33,11 @@ void simulation_complete(){
   auto end_time = std::chrono::high_resolution_clock::now();
   auto &sim = Simulation::get();
   std::chrono::duration<double> elapsed_seconds = end_time-g_start_time;
-  std::cerr << "Run for " << std::dec << g_rp2040.tickcnt() << " ticks" << std::endl;
-  std::cerr << "Run for " << std::dec << sim.current_time() << " simulation ticks" << std::endl;
-  std::cerr << "Run for " << elapsed_seconds.count() << " seconds" << std::endl;
-  std::cerr << "Emulation speed " << g_rp2040.tickcnt()/elapsed_seconds.count()/1000'000.0 << " MHz" << std::endl;
-  std::cerr << "Simulation ran at " << sim.current_time() / elapsed_seconds.count() / sim.from_seconds(1) * 100.0 << "% real time" << std::endl;
+  std::cerr << "Run for                : " << std::dec << sim.current_time() << " simulation ticks\n";
+  std::cerr << "Run for                : " << elapsed_seconds.count() << " seconds\n";
+  std::cerr << "Emulated               : " << sim.to_microseconds(sim.current_time()) / 1'000'000.0 << " Seconds\n";
+  std::cerr << "Emulated device ran at : " << g_rp2040.tickcnt()/elapsed_seconds.count()/1000'000.0 << " MHz\n";
+  std::cerr << "Emulation speed        : " << sim.current_time() / elapsed_seconds.count() / sim.from_seconds(1) * 100.0 << "% real time\n";
   std::cerr << "EXITING" << std::endl;
   sim.abort();
 }
