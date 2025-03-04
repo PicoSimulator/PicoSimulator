@@ -19,6 +19,7 @@ jobs:
           repository: PicoSimulator/PicoSimulator-private
           ssh-key: ${{ secrets.PRIVATE_REPO_SSH_KEY }}  
           path: ${{ ENV.PRIVATE_PATH }}
+          submodules: true
       - name: Install dependencies
         run: |
           sudo apt install cmake
