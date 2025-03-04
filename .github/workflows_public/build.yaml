@@ -33,7 +33,7 @@ jobs:
       - name: copy build artifacts
         run: |
           mkdir -p ${{ENV.PUBLIC_PATH}}/build/
-          cp -r ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/picosim_app ${{ENV.PUBLIC_PATH}}/build
+          cp -r ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/app/picosim_app ${{ENV.PUBLIC_PATH}}/build
           cp -r ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/extlib/epdsim/libepdsim.so ${{ENV.PUBLIC_PATH}}/build
       - name: upload build artifacts
         uses: actions/upload-artifact@v4
