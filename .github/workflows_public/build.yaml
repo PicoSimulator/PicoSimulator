@@ -24,11 +24,12 @@ jobs:
         uses: daaku/gh-action-apt-install@v4
         with:
           packages:  cmake libxrandr-dev libxcursor-dev libudev-dev libopenal-dev libflac-dev libvorbis-dev libgl1-mesa-dev libegl1-mesa-dev libdrm-dev libgbm-dev
-      - name: Build with cmake
+      - name: Build release with cmake
         uses: lukka/run-cmake@v10
         with: 
-          configurePreset: gcc_release
           cmakeListsTxtPath: ${{ENV.PRIVATE_PATH}}/CMakeLists.txt
+          configurePreset: gcc_release
+          buildPreset: gcc_release
       - name: copy build artifacts
         run: |
           mkdir -p ${{ENV.PUBLIC_PATH}}/build/
