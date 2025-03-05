@@ -2,6 +2,8 @@ on:
   push:
     branches:
       - main
+    tags:
+      - **
   workflow_dispatch: # This allows you to run the workflow manually
     inputs: 
       reason: 
@@ -44,9 +46,16 @@ jobs:
       - name: commit and push if changes
         continue-on-error: true
         run: |
+          pushd ${{ENV.PRIVATE_PATH}}
+          tag=`git tag --points-at HEAD`
+          popd
           git -C ${{ENV.PUBLIC_PATH}} remote set-url origin git@github.com:PicoSimulator/PicoSimulator.git
           git -C ${{ENV.PUBLIC_PATH}} add .
           git -C ${{ENV.PUBLIC_PATH}} commit -m "${{ env.COMMIT_MSG }}"
-          git -C ${{ENV.PUBLIC_PATH}} push
+          if [[ $tag ]] ;
+          then
+            git tag $tag ;
+          fi
+          git -C ${{ENV.PUBLIC_PATH}} push --atomic main $tag
         
 
