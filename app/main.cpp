@@ -9,6 +9,14 @@
 #include "ext/io/pulls.hpp"
 #include "loader.hpp"
 
+struct ListArgs : public argparse::Args {
+  int run() override {
+    // Configs
+    // Boards
+    // Devices
+  }
+};
+
 struct MyArgs : public argparse::Args {
   std::string &binary = arg("flash_binary", "Path to binary file to load into flash");
   std::optional<std::string> &uart0 = kwarg("uart0", "Path to UART0 file, can be PTY");
@@ -17,6 +25,9 @@ struct MyArgs : public argparse::Args {
   bool &core1_trace = kwarg("core1.trace", "Enable trace for core 1").set_default(false);
   bool &core1_enable = kwarg("core1.enable", "Enable core 1").set_default(false);
   bool &epd3in7 = flag("epd3in7", "Enable Waveshare EPD 3.7in display");
+  std::optional<std::string> &trace_file = kwarg("trace_file", "Path to trace file");
+  std::vector<std::string> &trace_enables = kwarg("trace_enable", "Enable trace for named item");
+  std::vector<std::string> &trace_disables = kwarg("trace_disable", "Disable trace for named item");
 };
 
 struct Args : public argparse::Args {
@@ -83,13 +94,15 @@ int main(int argc, char** argv)
     std::vector<std::unique_ptr<IODevice>> devices;
     if (args.epd3in7) {
       std::unique_ptr<IODevice> device = create_device("epdsim:epd3in7");
-      device->get_named_pin("D/~C")->connect_to_net(&g_rp2040.net("GP8"));
-      device->get_named_pin("BUSY")->connect_to_net(&g_rp2040.net("GP13"));
-      device->get_named_pin("~RESET")->connect_to_net(&g_rp2040.net("GP12"));
-      device->get_named_pin("~CS")->connect_to_net(&g_rp2040.net("GP9"));
-      device->get_named_pin("SCLK")->connect_to_net(&g_rp2040.net("GP10"));
-      device->get_named_pin("MOSI")->connect_to_net(&g_rp2040.net("GP11"));
-      devices.push_back(std::move(device));
+      if (device) {
+        device->get_named_pin("D/~C")->connect_to_net(&g_rp2040.net("GP8"));
+        device->get_named_pin("BUSY")->connect_to_net(&g_rp2040.net("GP13"));
+        device->get_named_pin("~RESET")->connect_to_net(&g_rp2040.net("GP12"));
+        device->get_named_pin("~CS")->connect_to_net(&g_rp2040.net("GP9"));
+        device->get_named_pin("SCLK")->connect_to_net(&g_rp2040.net("GP10"));
+        device->get_named_pin("MOSI")->connect_to_net(&g_rp2040.net("GP11"));
+        devices.push_back(std::move(device));
+      }
     }
     
     g_start_time = std::chrono::high_resolution_clock::now();

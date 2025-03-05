@@ -3,6 +3,7 @@
 #include "platform/rpi/rp2040/peripheral.hpp"
 
 #include "platform/rpi/rp2040/peri/dma/dma.hpp"
+#include "platform/rpi/rp2040/peri/pio/pio.hpp"
 
 namespace RP2040::Bus {
   class AHBLite final : public IPeripheralPort, public IClockable {
@@ -10,6 +11,10 @@ namespace RP2040::Bus {
     AHBLite(DMA::DMA &dma)
     : m_runner{bus_task()}
     , m_dma{dma}
+    , m_pio{
+      PIO::PIOBlock{0},
+      PIO::PIOBlock{1}
+    }
     {}
     virtual void tick() override;
   protected:
@@ -21,6 +26,7 @@ namespace RP2040::Bus {
     ClockTask m_runner;
 
     DMA::DMA &m_dma;
+    PIO::PIOBlock m_pio[2];
 
   };
 
