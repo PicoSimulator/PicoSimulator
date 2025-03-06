@@ -4,6 +4,7 @@
 #include "platform/rpi/rp2040/gpio.hpp"
 #include "platform/rpi/rp2040/peripheral.hpp"
 #include "fifo.hpp"
+#include "util/saturating_counter.hpp"
 
 namespace RP2040::PIO{
   using PIOInstrMemory = std::array<uint16_t, 32>;
@@ -65,7 +66,9 @@ namespace RP2040::PIO{
       uint8_t hi5 =  (instr>>8)&0x1f;
       uint16_t nextPC;
       bool was_stalled = m_stall;
-      if (m_pc == m_wrap_top) {
+      if (m_stall) {
+        nextPC = m_pc;
+      }else if (m_pc == m_wrap_top) {
         nextPC = m_wrap_bottom;
       } else {
         nextPC = m_pc+1;
@@ -153,7 +156,7 @@ namespace RP2040::PIO{
               bits_in = m_osr & ((1 << BitCnt) - 1);
               break;
             }
-            m_shift_in_counter += BitCnt;
+            m_input_shift_cnt += BitCnt;
             if (m_in_shiftdir) {
               //shift into MSB
               m_isr >>= BitCnt;
@@ -165,12 +168,12 @@ namespace RP2040::PIO{
           }
           // handle autopush
           if (autopush() 
-              && m_shift_in_counter >= m_push_threshold ) {
+              && m_input_shift_cnt >= m_push_threshold ) {
             if (m_rx_fifo.full()) {
               m_stall = true;
             } else {
               m_rx_fifo.push(m_isr);
-              m_shift_in_counter = 0;
+              m_input_shift_cnt = 0;
               m_isr = 0;
               m_stall = false;
             }
@@ -188,8 +191,15 @@ namespace RP2040::PIO{
               bits_out = m_osr >> (32-BitCnt);
               m_osr <<= BitCnt;
             }
+            m_output_shift_cnt += BitCnt;
             switch (mid3) {
               case 0b000: // PINS
+              {
+                for (int i = 0; i < BitCnt; i++) {
+                  m_block.m_gpio[(i+m_out_base)%32].set_output(bits_out & 1);
+                  bits_out >>= 1;
+                }
+              } break;
               case 0b001: // X
                 m_scratch_x = bits_out; break;
               case 0b010: // Y
@@ -197,26 +207,112 @@ namespace RP2040::PIO{
               case 0b011: // NULL
                 break;
               case 0b100: // PINDIRS
+              {
+                for (int i = 0; i < BitCnt; i++) {
+                  m_block.m_gpio[(i+m_out_base)%32].set_oe(bits_out & 1);
+                  bits_out >>= 1;
+                }
+              } break;
               case 0b101: // PC
                 nextPC = bits_out; break;
               case 0b110: // ISR
+                m_isr = bits_out; 
+                m_input_shift_cnt = BitCnt;
                 
               case 0b111: // EXEC
+                m_exec_instr = bits_out;
+                m_instr_exec = true;
+                break;
             }
           }
           // handle autopull
           if (autopull() 
-              && m_shift_out_counter >= m_pull_threshold ) {
+              && m_output_shift_cnt >= m_pull_threshold ) {
             if (m_tx_fifo.empty()) {
               m_stall = true;
             } else {
               m_stall = false;
               m_osr = m_tx_fifo.pop();
-              m_shift_out_counter = 0;
+              m_output_shift_cnt = 0;
             }
           }
         } break;
         case 0x8000: // PUSH/PULL
+        {
+          bool cond1 = (mid3&4)?(m_output_shift_cnt >= m_pull_threshold):(m_input_shift_cnt >= m_push_threshold);
+          bool cond2 = (mid3&4)?m_tx_fifo.empty():m_rx_fifo.full();
+          if 
+          switch (mid3) {
+            case 0b000: // PUSH, ALWAYS, NOBLOCK
+            if (!m_rx_fifo.full()) {
+              m_rx_fifo.push(m_isr);
+              m_isr = 0;
+              m_input_shift_cnt = 0;
+              m_stall = false;
+            } break;
+            case 0x001: // PUSH, ALWAYS, BLOCK
+            {
+              if (m_rx_fifo.full()) {
+                m_stall = true;
+              } else {
+                m_rx_fifo.push(m_isr);
+                m_isr = 0;
+                m_input_shift_cnt = 0;
+                m_stall = false;
+              }
+            } break;
+            case 0x010: // PUSH, IFFULL, NOBLOCK
+            {
+              if (m_input_shift_cnt >= m_push_threshold && !m_rx_fifo.full()) {
+                m_rx_fifo.push(m_isr);
+                m_isr = 0;
+                m_input_shift_cnt = 0;
+                m_stall = false;
+              }
+            } break;
+            case 0x011: // PUSH, IFFULL, BLOCK
+            {
+              if (m_input_shift_cnt >= m_push_threshold) {
+                if (m_rx_fifo.full()) {
+                  m_stall = true;
+                } else {
+                  m_rx_fifo.push(m_isr);
+                  m_isr = 0;
+                  m_input_shift_cnt = 0;
+                  m_stall = false;
+                }
+              }
+            } break;
+            case 0x100: // PULL, ALWAYS, NOBLOCK
+            {
+              if (!m_tx_fifo.empty()) {
+                m_osr = m_tx_fifo.pop();
+                m_output_shift_cnt = 0;
+                m_stall = false;
+              }
+            } break;
+            case 0x101: // PULL, ALWAYS, BLOCK
+            {
+              if (m_tx_fifo.empty()) {
+                m_stall = true;
+              } else {
+                m_osr = m_tx_fifo.pop();
+                m_output_shift_cnt = 0;
+                m_stall = false;
+              }
+            } break;
+            case 0x110: // PULL, IFEMPTY, NOBLOCK
+            {
+              if (m_output_shift_cnt >= m_pull_threshold && !m_tx_fifo.empty()) {
+                m_osr = m_tx_fifo.pop();
+                m_output_shift_cnt = 0;
+                m_stall = false;
+              } 
+            } break;
+            case 0x111: // PULL, IFEMPTY, BLOCK
+
+          }
+        } break;
         case 0xa000: // MOV
         case 0xc000: // IRQ
         case 0xe000: // SET
@@ -227,18 +323,16 @@ namespace RP2040::PIO{
       if (m_side_en && !was_stalled) {
         if (side_set & (1 << (m_sideset_count-1))) {
           for (int i = 0; i < m_sideset_count-1; i++) {
-            m_block.m_gpio[(m_sideset_base+i)%32]
+            m_block.m_gpio[(m_sideset_base+i)%32];
           }
         }
       } else if (!was_stalled){
         for (int i = 0; i < m_sideset_count; i++) {
-          m_block.m_gpio[(m_sideset_base+i)%32]
+          m_block.m_gpio[(m_sideset_base+i)%32];
         }
       }
 
-      if (!m_stall){
-        m_pc = nextPC;
-      }
+      m_pc = nextPC;
     }
     void tick();
     uint32_t pinctrl() const { 
@@ -267,7 +361,7 @@ namespace RP2040::PIO{
     bool osre() const { }
     bool autopush() const { return m_autopush; }
     bool autopull() const { return m_autopull; }
-    auto &gpios() { return m_block.gpio; }
+    // auto &gpios() { return m_block.gpio; }
   protected:
   private:
     PIOBlock &m_block;
@@ -275,19 +369,20 @@ namespace RP2040::PIO{
     PIORxFifo m_rx_fifo;
     uint32_t m_scratch_x, m_scratch_y;
     uint32_t m_osr, m_isr;
-    uint16_t m_instr;
+    uint16_t m_instr, m_exec_instr;
     uint8_t m_id;
     uint8_t m_pc;
     uint8_t m_wrap_top, m_wrap_bottom;
     uint8_t m_delay_cycles;
     uint8_t m_pull_threshold, m_push_threshold;
-    uint8_t m_input_shift_cnt, m_output_shift_cnt;
+    saturating_counter<uint8_t, 32> m_input_shift_cnt, m_output_shift_cnt;
     uint8_t m_out_base, m_set_base, m_sideset_base, m_in_base;
     uint8_t m_out_count, m_set_count, m_sideset_count;  
     uint8_t m_jmp_pin;
     // 0: shift left, 1: shift right
     bool m_in_shiftdir, m_out_shiftdir;
     bool m_autopull, m_autopush;
+    bool m_side_en;
     bool m_stall;
     bool m_instr_exec;
   };
