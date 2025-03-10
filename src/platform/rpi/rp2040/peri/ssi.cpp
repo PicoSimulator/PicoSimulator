@@ -6,8 +6,8 @@ using namespace RP2040;
 void SSI::tick()
 {
   if (/* (m_ctrlr0 & 0x000f'f000) == 0x0007'0000 && */ m_tx_fifo.count() > 0 && !m_rx_fifo.full()) {
-    if (m_ctrlr0 & 0x0080'0000) {
-      spidev().set_cs(0);
+    if (m_ctrlr0 & 0x0080'0000 && spidev()) {
+      spidev()->set_cs(0);
     }
     switch(m_ctrlr0 & 0x0030'0000) {
       case 0x0000'0000: /*Standard SPI, 1-bit per SCK, full-duplex*/
@@ -16,9 +16,13 @@ void SSI::tick()
     }
     std::cout << "txpop[" << std::dec << m_tx_fifo.count() << "]" << std::endl;
     std::cout << "rxpush[" << std::dec << m_rx_fifo.count() << "]" << std::endl;
-    m_rx_fifo.push(spidev().spi_exchange_byte(m_tx_fifo.pop()));
-    if (m_ctrlr0 & 0x0080'0000) {
-      spidev().set_cs(1);
+    uint32_t rx = 0, tx = m_tx_fifo.pop();
+    if (spidev()) {
+      rx = spidev()->spi_exchange_byte(tx);
+    }
+    m_rx_fifo.push(rx);
+    if (m_ctrlr0 & 0x0080'0000 && spidev()) {
+      spidev()->set_cs(1);
     }
   }
 }
