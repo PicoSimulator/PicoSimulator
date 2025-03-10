@@ -1,0 +1,50 @@
+on: 
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch: # This allows you to run the workflow manually
+
+name: Build
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      PRIVATE_PATH: ${{github.workspace}}
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v2
+        with:
+          repository: PicoSimulator/PicoSimulator-private
+          path: ${{ ENV.PRIVATE_PATH }}
+          submodules: true
+      - name: Install dependencies
+        uses: daaku/gh-action-apt-install@v4
+        with:
+          packages:  cmake libxrandr-dev libxcursor-dev libudev-dev libopenal-dev libflac-dev libvorbis-dev libgl1-mesa-dev libegl1-mesa-dev libdrm-dev libgbm-dev libfreetype-dev
+      - name: ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+      - name: Build release with cmake
+        uses: lukka/run-cmake@v10
+        with: 
+          cmakeListsTxtPath: ${{ENV.PRIVATE_PATH}}/CMakeLists.txt
+          configurePreset: gcc_release
+          buildPreset: gcc_release
+          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
+      - name: Build debug with cmake
+        uses: lukka/run-cmake@v10
+        with: 
+          cmakeListsTxtPath: ${{ENV.PRIVATE_PATH}}/CMakeLists.txt
+          configurePreset: gcc_debug
+          buildPreset: gcc_debug
+          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
+      - name: upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PicoSim Release Executables
+          path: |
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/app/picosim_app
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/extlib/epdsim/libepdsim.so
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_debug/app/picosim_app
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_debug/extlib/epdsim/libepdsim.so
