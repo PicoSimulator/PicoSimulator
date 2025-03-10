@@ -54,6 +54,6 @@ jobs:
           then
             git tag $tag ;
           fi
-          git -C ${{ENV.PUBLIC_PATH}} push --atomic main $tag
+          git -C ${{ENV.PUBLIC_PATH}} push --atomic origin main $tag
         
 
