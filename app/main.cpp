@@ -143,7 +143,7 @@ struct RunArgs : public argparse::Args {
       std::string component_name = name.substr(0, name.find('.'));
       json component;
       for (auto &_component : env_config["components"]) {
-        if (_component[name] == component_name) {
+        if (_component["name"] == component_name) {
           component = _component;
           break;
         }
