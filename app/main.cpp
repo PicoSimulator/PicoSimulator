@@ -2,16 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "platform/rpi/rp2040/rp2040.hpp"
 #include "simulation.hpp"
 #include "argparse/argparse.hpp"
 #include <chrono>
-#include "ext/io/pulls.hpp"
 #include "loader.hpp"
+#include "schema.hpp"
 #include <filesystem>
 
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
 namespace fs = std::filesystem;
 
 
@@ -57,7 +54,11 @@ json get_config(){
   if (!fs::exists(config_path)) {
     fs::create_directories(config_path.parent_path());
     std::ofstream file{config_path};
-    file << "{}";
+    json config = {
+      {"environments", json::array()},
+      {"libraries", json::array()},
+    };
+    file << config.dump(2);
     file.close();
   }
   std::ifstream file(config_path);
@@ -73,8 +74,10 @@ void save_config(const json &config){
 
 fs::path get_env_path(const std::string &name){
   auto config = get_config();
-  if (config["environments"].contains(name)) {
-    return config["environments"][name]["path"];
+  for (auto &env : config["environments"]) {
+    if (env["name"] == name) {
+      return env["path"];
+    }
   }
   // check if this is a path to an environment
   if(fs::exists(name)){
@@ -97,8 +100,19 @@ void save_env(const std::string &name, const json &env){
   std::ofstream file(env_path/"env.json");
   file << env.dump(2);
   file.close();
-  json cfg_env = {{"path", env_path/"env.json"}};
-  config["environments"][name] = cfg_env;
+  auto &envs = config["environments"];
+  json cfg_env = {
+    {"name", name},
+    {"path", env_path/"env.json"}
+  };
+  for (auto &env : config["environments"]) {
+    if (env["name"] == name) {
+      env = cfg_env;
+      save_config(config);
+      return;
+    }
+  }
+  config["environments"].push_back(cfg_env);
   save_config(config);
 }
 
@@ -114,25 +128,37 @@ struct RunArgs : public argparse::Args {
     std::map<std::string, std::unique_ptr<IODevice>> &devices = sim.components();
     std::map<std::string, std::unique_ptr<Net>> nets;
     fs::current_path(env_path.parent_path());
-    for (auto &[name, component] : env_config["components"].items()) {
+    // instantiate components
+    for (auto &component : env_config["components"]) {
+      std::string name = component["name"];
       auto dev = create_device(component["device"]);
       devices[name] = std::move(dev);
     }
+    // apply component params
+    // must be done after all are instantiated as they may
+    // refer back to each other
     for (auto &param : args) {
       std::string name = param.substr(0, param.find('='));
       std::string value = param.substr(param.find('=') + 1);
       std::string component_name = name.substr(0, name.find('.'));
-      if (!devices.contains(component_name)) {
+      json *component = nullptr;
+      for (auto &_component : env_config["components"]) {
+        if (_component["name"] == component_name) {
+          component = &_component;
+          break;
+        }
+      }
+      if (component == nullptr) {
         throw std::runtime_error("Component not found: " + component_name);
       }
-      auto &dev = env_config["components"][component_name];
-      if (!dev.contains("params")) {
-        dev["params"] = json::object();
+      if (!component->contains("params")) {
+        (*component)["params"] = json::object();
       }
       std::string param_name = name.substr(name.find('.') + 1);
-      dev["params"][param_name] = value;
+      (*component)["params"][param_name] = value;
     }
-    for (auto &[name, component] : env_config["components"].items()) {
+    for (auto &component : env_config["components"]) {
+      std::string name = component["name"].template get<std::string>();
       auto &dev = *devices[name];
       for (auto &[param, value] : component["params"].items()) {
         if (!dev.set_param(param, value)) {
@@ -141,11 +167,12 @@ struct RunArgs : public argparse::Args {
       }
     }
 
-
-    for (auto &[name, net] : env_config["nets"].items()) {
+    // create Nets and connections.
+    for (auto &net : env_config["nets"]) {
+      std::string name = net["name"];
       nets[name] = std::make_unique<Net>(name);
       auto *net_obj = nets[name].get();
-      for (auto &conn : net) {
+      for (auto &conn : net["connections"]) {
         std::string conn_name = conn.template get<std::string>();
         if (conn_name.find('.') != std::string::npos) {
           std::string left = conn_name.substr(0, conn_name.find('.'));
