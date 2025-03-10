@@ -43,6 +43,12 @@ public:
     assert(it != m_named_pins.end());
     m_named_pins.erase(it);
   }
+  void ready() override
+  {
+    for (auto &[name, device] : m_sub_devices) {
+      std::get<0>(device)->ready();
+    }
+  }
 protected:
 private:
   std::map<std::string, NetConnection&> m_named_pins;

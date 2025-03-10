@@ -6,9 +6,16 @@
 class ROsc : public Clock, public IClockable{
 public:
   ROsc(uint32_t freq)
+  : m_freq{freq}
+  {}
+  void set_freq(uint32_t freq)
+  {
+    m_freq = freq;
+  }
+  void start() 
   {
     auto &sim = Simulation::get();
-    sim.schedule_periodic(Simulation::from_hz(freq), *this);
+    sim.schedule_periodic(Simulation::from_hz(m_freq), *this);
   }
   void tick() override 
   {
@@ -20,6 +27,6 @@ public:
   }
 protected:
 private:
-
+  uint32_t m_freq;
 
 };
