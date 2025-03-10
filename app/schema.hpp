@@ -1,6 +1,7 @@
 #pragma once
 
 #include <nlohmann/json.hpp>
+using json = nlohmann::ordered_json;
 
 typedef bool (*schema_validate_fn)(const json &json);
 

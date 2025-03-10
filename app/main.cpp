@@ -2,16 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
-#include "platform/rpi/rp2040/rp2040.hpp"
 #include "simulation.hpp"
 #include "argparse/argparse.hpp"
 #include <chrono>
-#include "ext/io/pulls.hpp"
 #include "loader.hpp"
+#include "schema.hpp"
 #include <filesystem>
 
-#include <nlohmann/json.hpp>
-using json = nlohmann::ordered_json;
 namespace fs = std::filesystem;
 
 
