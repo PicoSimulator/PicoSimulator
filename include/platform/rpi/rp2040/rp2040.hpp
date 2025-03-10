@@ -113,10 +113,10 @@ namespace RP2040{
       }
       if (name == "seed"){
         // seed the ROSC 
-        unsigned seed = std::atoi(value);
+        unsigned seed = std::atoi(value.c_str());
         if (seed == 0)
           return false;
-        std::srand(seed)
+        std::srand(seed);
         m_rosc.set_freq(uint32_t(6'500'000 + (std::rand()-(RAND_MAX/2))/500));
         return true;
       }

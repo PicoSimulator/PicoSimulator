@@ -15,7 +15,7 @@ public:
   void start() 
   {
     auto &sim = Simulation::get();
-    sim.schedule_periodic(Simulation::from_hz(freq), *this);
+    sim.schedule_periodic(Simulation::from_hz(m_freq), *this);
   }
   void tick() override 
   {
