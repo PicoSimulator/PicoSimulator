@@ -141,21 +141,21 @@ struct RunArgs : public argparse::Args {
       std::string name = param.substr(0, param.find('='));
       std::string value = param.substr(param.find('=') + 1);
       std::string component_name = name.substr(0, name.find('.'));
-      json component;
+      json *component = nullptr;
       for (auto &_component : env_config["components"]) {
         if (_component["name"] == component_name) {
-          component = _component;
+          component = &_component;
           break;
         }
       }
-      if (component.empty()) {
+      if (component == nullptr) {
         throw std::runtime_error("Component not found: " + component_name);
       }
-      if (!component.contains("params")) {
-        component["params"] = json::object();
+      if (!component->contains("params")) {
+        (*component)["params"] = json::object();
       }
       std::string param_name = name.substr(name.find('.') + 1);
-      component["params"][param_name] = value;
+      (*component)["params"][param_name] = value;
     }
     for (auto &component : env_config["components"]) {
       std::string name = component["name"].template get<std::string>();
