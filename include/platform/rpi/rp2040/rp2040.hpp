@@ -34,7 +34,7 @@ namespace RP2040 {
 
 namespace RP2040{
 
-  class RP2040 final: public IResettable, public IClockable{
+  class RP2040 final: public IResettable, public IClockable, public IODevice{
   public:
     enum IRQ{
       TIMER_IRQ_0 = 0,
@@ -66,9 +66,7 @@ namespace RP2040{
     };
     RP2040();
     virtual void reset() override;
-    void run(unsigned int max_ticks);
     void tick() override;
-    void load_binary(const std::string &path);
     ARMv6M::ARMv6MCore &core0() { return m_cores[0]; }
     ARMv6M::ARMv6MCore &core1() { return m_cores[1]; }
     UART &UART0() {return m_apb.uart0(); }
@@ -84,17 +82,6 @@ namespace RP2040{
     ClockDiv &clk_gpout2() { return clkc_gpout[2]; }
     ClockDiv &clk_gpout3() { return clkc_gpout[3]; }
 
-    Net &net(const std::string &name) { 
-      Net *net = std::find_if(
-        m_nets.begin(), 
-        m_nets.end(), 
-        [&name](const Net &net){ 
-          return net.name() == name; 
-        });
-      assert(net != m_nets.end());
-      return *net;
-    }
-
     Tracing::VCD::Module &vcd() { return m_vcd; }
     
 
@@ -108,6 +95,24 @@ namespace RP2040{
 
     uint64_t tickcnt() const { return m_tickcnt; }
 
+
+    bool set_param(const std::string &name, const std::string &value) override{
+      if(name == "flash"){
+        auto &_flash = Simulation::get().components().at(value);
+        auto *flash = dynamic_cast<W25QFlash *>(_flash.get());
+        m_SSI.set_spidev(flash);
+        return true;
+      }
+      if (name == "uart0"){
+        UART0().open(value);
+        return true;
+      }
+      if (name == "uart1"){
+        UART1().open(value);
+        return true;
+      }
+      return false;
+    }
   protected:
   private:
     class IOPort final: public IReadWritePort<uint32_t>{
@@ -230,7 +235,6 @@ namespace RP2040{
     Pad m_pads_qspi[6];
     GPIO m_gpio_bank0[30];// SWDIO,SWCLK have pads but no GPIO connections!
     GPIO m_gpio_qspi[6];
-    std::array<Net, 38> m_nets;
     std::array<GPIOSignal, 30> m_sio;
     std::array<GPIOSignal, 6> m_sio_hi;
 

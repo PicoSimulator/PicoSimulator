@@ -11,7 +11,13 @@ public:
 
     spi_start(nullptr, 1);
   }
-  virtual ~W25QFlash() {}
+  virtual ~W25QFlash() {
+    if (m_save_on_exit) {
+      std::ofstream file(m_file_path, std::ios::binary);
+      file.write(reinterpret_cast<const char *>(m_flash.data()), m_flash.size());
+      file.close();
+    }
+  }
 
   std::span<uint8_t> flash() { return m_flash; }
   std::span<const uint8_t> flash() const { return m_flash; }
@@ -109,6 +115,48 @@ public:
   {
     std::copy(data.begin(), data.end(), m_flash.begin());
   }
+
+  void load_file(const std::string &path)
+  {
+    std::ifstream file(path, std::ios::binary);
+    if (!file) {
+      std::cerr << "Failed to open file " << path << "\n";
+      return;
+    }
+    std::vector<uint8_t> data;
+    file.seekg(0, std::ios::end);
+    data.resize(file.tellg());
+    file.seekg(0, std::ios::beg);
+    file.read(reinterpret_cast<char *>(data.data()), data.size());
+    load_binary_data(data);
+  }
+
+  bool set_param(const std::string &name, const std::string &value) override
+  {
+    if (name == "file") {
+      m_file_path = value;
+      load_file(value);
+      if (!m_load_file_path.empty())
+        load_file(m_load_file_path);
+      return true;
+    }
+    if (name == "load") {
+      m_load_file_path = value;
+      load_file(value);
+      return true;
+    }
+    if (name == "save") {
+      if (value == "true") {
+        m_save_on_exit = true;
+      } else if (value == "false") {
+        m_save_on_exit = false;
+      } else {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
 private:
   enum State{
     CMD,
@@ -145,5 +193,7 @@ private:
   std::array<uint8_t, 0x0100'0000> m_flash;
   std::array<uint8_t, 256> m_page_buffer;
   bool m_write_enabled;
+  std::string m_file_path, m_load_file_path;
+  bool m_save_on_exit = false;
 
 };

@@ -30,7 +30,8 @@ namespace RP2040{
     }
     virtual ~SSI() {};
     virtual void tick() override;
-    W25QFlash &spidev() { return m_spidev; }
+    W25QFlash &spidev() { return *m_spidev; }
+    void set_spidev(W25QFlash *spidev) { m_spidev = spidev; }
     GPIOSignal &SCK() { return m_sck; }
     GPIOSignal &SS() { return m_ss; }
     GPIOSignal &D0() { return m_d0; }
@@ -63,7 +64,7 @@ namespace RP2040{
     uint32_t m_spi_ctrlr0;
 
 
-    W25QFlash m_spidev;
+    W25QFlash *m_spidev;
 
     enum RegOffset{
       CTRLR0 = 0x00,
