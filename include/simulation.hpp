@@ -4,6 +4,9 @@
 #include <cstdint>
 #include <queue>
 #include <limits>
+#include <map>
+#include <memory>
+#include "ext/io/device.hpp"
 
 #include "clock.hpp"
 
@@ -18,6 +21,13 @@ public:
   // 100ps per tick
   static Simulation &get();
   void run(simulation_time_t max_time) {
+    for (auto &[name, device] : m_components) {
+      device->ready();
+    }
+    if (m_schedule.empty()) {
+      std::cerr << "Nothing to simulate!\n";
+      return;
+    }
     while(m_time < max_time) {
       auto &[time, c, period] = m_schedule.top();
       m_schedule.pop();
@@ -29,6 +39,9 @@ public:
   }
   void abort() {
     m_time = std::numeric_limits<simulation_time_t>::max();
+  }
+  void exit() {
+    m_components.clear();
   }
   simulation_time_t current_time() const { return m_time; }
   void schedule(simulation_time_t time, IClockable &c) {
@@ -54,6 +67,8 @@ public:
   Tracing::VCD::VCDFile &vcd() { return m_vcd; }
   Tracing::VCD::Module &nets() { return m_nets; }
 
+  auto &components() { return m_components; }
+
 protected:
 private:
   Simulation()
@@ -78,4 +93,5 @@ private:
   Tracing::VCD::Module m_nets{"NETS"};
   Tracing::VCD::Time<simulation_time_t> m_time{"Simulation_Time", 64};
   Tracing::VCD::VCDFile m_vcd;
+  std::map<std::string, std::unique_ptr<IODevice>> m_components;
 };

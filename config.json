@@ -1,16 +1,37 @@
 {
   "name": "Test config",
-  "elements": {
-    "proc1": {
-      "processor": "rp2040",
-      "flash":{
-        "size": "4MB",
-        "file": "flash.bin",
-        "save": true
-      },
-      "psram":{
-        "size": "8MB"
-      }
+  "components": [
+    {
+      "name": "proc1",
+      "device": "rp2040"
+    },
+    {
+      "name": "qspi_cs_pullup",
+      "device": "resistor",
+      "value": "100k"
+    },
+    {
+      "name": "QSPI_flash",
+      "device": "w25q128",
+      "file": "flash.bin"
     }
-  }
+  ],
+  "nets": [
+    {
+      "name": "QSPI_CS", 
+      "connections": [
+        "proc1.QSPI_CS0",
+        "qspi_cs_pullup.A",
+        "QSPI_flash.~CS"
+      ]
+    },
+    {
+      "name": "VCC", 
+      "connections": [
+        "VCC",
+        "qspi_cs_pullup.B"
+      ]
+    }
+  ]
+  
 }

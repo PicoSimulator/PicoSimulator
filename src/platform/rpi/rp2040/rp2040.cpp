@@ -117,12 +117,6 @@ RP2040::RP2040::RP2040()
 , m_pads_qspi{ENUM_6(EVAL_PAD_QSPI)}
 , m_gpio_bank0{ENUM_30(EVAL_GPIO_BANK0)}
 , m_gpio_qspi{ENUM_6(EVAL_GPIO_QSPI)}
-, m_nets{
-  {{"GP0"}, {"GP1"}, {"GP2"}, {"GP3"}, {"GP4"}, {"GP5"}, {"GP6"}, {"GP7"}, {"GP8"}, {"GP9"},
-  {"GP10"}, {"GP11"}, {"GP12"}, {"GP13"}, {"GP14"}, {"GP15"}, {"GP16"}, {"GP17"}, {"GP18"}, {"GP19"},
-  {"GP20"}, {"GP21"}, {"GP22"}, {"GP23"}, {"GP24"}, {"GP25"}, {"GP26"}, {"GP27"}, {"GP28"}, {"GP29"},
-  {"SWDIO"}, {"SWCLK"}, {"QSPI_SCK"}, {"QSPI_CS0"}, {"QSPI_SD0"}, {"QSPI_SD1"}, {"QSPI_SD2"}, {"QSPI_SD3"}}
-}
 , m_sio{{ENUM_30(EVAL_PAD_BANK0_ADDR)}}
 , m_sio_hi{{ENUM_6(EVAL_PAD_QSPI_ADDR)}}
 , m_clocks{*this}
@@ -223,14 +217,16 @@ RP2040::RP2040::RP2040()
   clk_rtc.sink_add(m_apb.rtc());
 
   auto &sim = Simulation::get();
+  std::array<std::string, 38> pins{
+    "GP0", "GP1", "GP2", "GP3", "GP4", "GP5", "GP6", "GP7", "GP8", "GP9",
+    "GP10", "GP11", "GP12", "GP13", "GP14", "GP15", "GP16", "GP17", "GP18", "GP19",
+    "GP20", "GP21", "GP22", "GP23", "GP24", "GP25", "GP26", "GP27", "GP28", "GP29",
+    "SWDIO", "SWCLK", "QSPI_SCK", "QSPI_CS0", "QSPI_SD0", "QSPI_SD1", "QSPI_SD2", "QSPI_SD3"
+  };
 
-  for (int i = 0; i < 32; i++) {
-    m_pads_bank0[i].connect_to_net(&m_nets[i]);
-    sim.nets().add_item(m_nets[i].vcd_variable());
-  }
-  for (int i = 0; i < 6; i++) {
-    m_pads_qspi[i].connect_to_net(&m_nets[i + 32]);
-    sim.nets().add_item(m_nets[i+32].vcd_variable());
+  
+  for (int i = 0; i < 38; i++) {
+    add_named_pin(pins[i], m_pads_bank0[i]);
   }
   m_vcd.add_item(m_ahb.vcd());
   m_vcd.add_item(m_cores[0].vcd());
@@ -246,18 +242,6 @@ void RP2040::RP2040::reset()
   m_cores[1].reset();
 }
 
-void RP2040::RP2040::run(unsigned int max_ticks)
-{
-  unsigned int ticks = 0;
-  while (ticks++ <= max_ticks) {
-    m_tickcnt++;
-    clk_sys.tick();
-    clk_ref.tick();
-    clk_peri.tick();
-    clk_rtc.tick();
-  }
-  m_cores[0].dump();
-}
 void RP2040::RP2040::tick()
 {
   m_tickcnt++;
@@ -265,27 +249,6 @@ void RP2040::RP2040::tick()
   clk_ref.tick();
   clk_peri.tick();
   clk_rtc.tick();
-}
-
-void RP2040::RP2040::load_binary(const std::string &path)
-{
-  std::cout << "RP2040::load_binary(" << path << ")" << std::endl;
-  std::ifstream file(path, std::ios::binary | std::ios::ate);
-  std::streamsize size = file.tellg();
-  file.seekg(0, std::ios::beg);
-  std::vector<uint8_t> buf;
-  buf.resize(size);
-
-  if (file.read((char*)buf.data(), size))
-  {
-      /* worked! */
-  } else {
-      /* failed! */
-      std::terminate();
-  }
-
-  m_XIP.load_binary_data(buf);
-  m_SSI.spidev().load_binary_data(buf);
 }
 
 #define READ(wordtype, ctype, out) \

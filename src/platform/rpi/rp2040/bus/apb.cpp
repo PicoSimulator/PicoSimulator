@@ -26,7 +26,7 @@ using namespace RP2040::Bus;
   o(0x0005'4000, m_timer, SYNC, NOTICK) \
   o(0x0005'8000, m_watchdog, SYNC, NOTICK) \
   o(0x0005'c000, m_rtc, SYNC, NOTICK) \
-  _(0x0006'0000, m_ros, SYNC, NOTICK) \
+  _(0x0006'0000, m_rosc, SYNC, NOTICK) \
   o(0x0006'4000, m_vreg, SYNC, NOTICK) \
   o(0x0006'c000, m_tbman, SYNC, NOTICK) \
 

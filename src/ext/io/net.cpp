@@ -47,7 +47,7 @@ void Net::remove_connection(NetConnection *conn){
 void NetConnection::connect_to_net(Net *net){
   if (this == nullptr)
     return;
-  if (m_connected_net)
+  if (m_connected_net && !m_special_net)
     m_connected_net->remove_connection(this);
   m_connected_net = net;
   m_connected_net->add_connection(this);
@@ -66,3 +66,16 @@ bool NetConnection::get_drive_value() const{
   return m_drive_value;
 }
 
+NetConnection *NetConnection::special(const std::string &name){
+  static NetConnection gnd{true};
+  gnd.set_drive_strength(255);
+  gnd.set_drive_value(0);
+  static NetConnection vcc{true};
+  vcc.set_drive_strength(255);
+  vcc.set_drive_value(1);
+  if(name == "GND")
+    return &gnd;
+  if(name == "VCC")
+    return &vcc;
+  return nullptr;
+}

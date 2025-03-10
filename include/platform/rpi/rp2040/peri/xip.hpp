@@ -27,12 +27,8 @@ namespace RP2040{
       m_acc_counter = 0;
       m_enabled = true;
     }
-    void load_binary_data(const std::span<uint8_t> data){
-      std::copy(data.begin(), data.end(), flash().begin());
-    }
     virtual void tick() override;
-    const std::span<uint8_t> flash() const { return m_ssi.spidev().flash(); }
-    std::span<uint8_t> flash() { return m_ssi.spidev().flash(); }
+    const std::span<uint8_t> flash() const { return m_ssi.flash(); }
     bool enabled() const { return m_enabled; }
 
   protected:

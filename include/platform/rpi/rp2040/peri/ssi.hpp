@@ -30,7 +30,17 @@ namespace RP2040{
     }
     virtual ~SSI() {};
     virtual void tick() override;
-    W25QFlash &spidev() { return m_spidev; }
+    W25QFlash *spidev() { return m_spidev; }
+    std::span<uint8_t> flash() const { return m_flash; }
+    void set_spidev(W25QFlash *spidev) { 
+      m_spidev = spidev; 
+      if (!m_spidev) {
+        m_flash = m_flash_priv;
+      } else {
+        m_flash = m_spidev->flash();
+      }
+
+    }
     GPIOSignal &SCK() { return m_sck; }
     GPIOSignal &SS() { return m_ss; }
     GPIOSignal &D0() { return m_d0; }
@@ -63,7 +73,7 @@ namespace RP2040{
     uint32_t m_spi_ctrlr0;
 
 
-    W25QFlash m_spidev;
+    W25QFlash *m_spidev;
 
     enum RegOffset{
       CTRLR0 = 0x00,
@@ -97,7 +107,8 @@ namespace RP2040{
     };
   
     GPIOSignal m_sck, m_ss, m_d0, m_d1, m_d2, m_d3;
-
+    std::array<uint8_t, 0x0100'0000> m_flash_priv;
+    std::span<uint8_t> m_flash;
   };
 
 }
