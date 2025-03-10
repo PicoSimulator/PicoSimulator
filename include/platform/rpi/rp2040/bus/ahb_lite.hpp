@@ -8,12 +8,16 @@
 namespace RP2040::Bus {
   class AHBLite final : public IPeripheralPort, public IClockable {
   public:
-    AHBLite(DMA::DMA &dma)
+    AHBLite(
+      DMA::DMA &dma,
+      std::array<std::reference_wrapper<InterruptSource>, 2> pio0_irqs,
+      std::array<std::reference_wrapper<InterruptSource>, 2> pio1_irqs
+    )
     : m_runner{bus_task()}
     , m_dma{dma}
     , m_pio{
-      PIO::PIOBlock{},
-      PIO::PIOBlock{}
+      PIO::PIOBlock{pio0_irqs},
+      PIO::PIOBlock{pio1_irqs}
     }
     {}
     virtual void tick() override;

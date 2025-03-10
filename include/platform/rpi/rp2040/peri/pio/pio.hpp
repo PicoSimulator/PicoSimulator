@@ -135,6 +135,9 @@ namespace RP2040::PIO{
   class PIOBlock final : public IClockable, public IPeripheralPort{
     friend class PIOStateMachine;
   public:
+    PIOBlock(std::array<std::reference_wrapper<InterruptSource>, 2> irqs)
+    : m_interrupts{irqs[0]}
+    {}
     const PIOInstrMemory &instrmem() const { return m_instrmem; }
     void tick() override;
     uint32_t flevel() const 
