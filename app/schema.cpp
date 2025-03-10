@@ -11,7 +11,7 @@ bool schema_validate_config(const json &json)
     std::vector<std::string> known_keys = {
         "environments",
         "libraries"
-    }
+    };
     for (auto &[key, _] : json.items()) {
         const auto it = std::find(known_keys.begin(), known_keys.end(), key.template get<std::string>());
         if (it == known_keys.end()) {
