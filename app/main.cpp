@@ -233,7 +233,11 @@ struct EnvCreateArgs : public argparse::Args {
     fs::path env_path = get_config_path().parent_path()/(*name);
     {
       fs::create_directories(env_path);
-      json env = {{"name", *name}};
+      json env = {
+        {"name", *name}, 
+        {"components", json::array()},
+        {"nets", json::array()}
+      };
       std::ofstream file(env_path/"env.json");
       file << env.dump(2);
       file.close();
