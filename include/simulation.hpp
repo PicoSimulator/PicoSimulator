@@ -21,6 +21,9 @@ public:
   // 100ps per tick
   static Simulation &get();
   void run(simulation_time_t max_time) {
+    for (auto &[name, device] : m_components) {
+      device->ready();
+    }
     if (m_schedule.empty()) {
       std::cerr << "Nothing to simulate!\n";
       return;

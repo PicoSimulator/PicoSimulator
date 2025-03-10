@@ -111,7 +111,20 @@ namespace RP2040{
         UART1().open(value);
         return true;
       }
+      if (name == "seed"){
+        // seed the ROSC 
+        unsigned seed = std::atoi(value);
+        if (seed == 0)
+          return false;
+        std::srand(seed)
+        m_rosc.set_freq(uint32_t(6'500'000 + (std::rand()-(RAND_MAX/2))/500));
+        return true;
+      }
       return false;
+    }
+    void ready() override
+    {
+      m_rosc.start();
     }
   protected:
   private:
