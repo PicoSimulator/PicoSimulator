@@ -12,8 +12,8 @@ namespace RP2040::Bus {
     : m_runner{bus_task()}
     , m_dma{dma}
     , m_pio{
-      PIO::PIOBlock{0},
-      PIO::PIOBlock{1}
+      PIO::PIOBlock{},
+      PIO::PIOBlock{}
     }
     {}
     virtual void tick() override;

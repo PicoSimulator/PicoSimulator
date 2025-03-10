@@ -92,19 +92,19 @@ namespace RP2040::PIO{
     {
       uint32_t out;
       if (!m_status_sel) {
-        out = m_tx_fifo.count() < m_status_n ? -1 : 0;
+        out = m_tx_fifo.FiFoBase<uint32_t, 8>::count() < m_status_n ? -1 : 0;
       } else {
-        out = m_rx_fifo.count() < m_status_n ? -1 : 0;
+        out = m_rx_fifo.FiFoBase<uint32_t, 8>::count() < m_status_n ? -1 : 0;
       }
       return out;
     }
   protected:
     uint8_t irq_decode(uint8_t val) {
       uint8_t irqNum = val & 0x07;
-      if (lo5 & 0x10) {
+      if (val & 0x10) {
         irqNum = irqNum & 0x04 + (irqNum + m_id) & 3;
       }
-      return irqNum;
+      return irqNum + 8;
     }
   private:
     PIOBlock &m_block;
@@ -129,6 +129,7 @@ namespace RP2040::PIO{
     bool m_side_en;
     bool m_stall;
     bool m_instr_exec;
+    bool m_status_sel;
   };
 
   class PIOBlock final : public IClockable, public IPeripheralPort{
