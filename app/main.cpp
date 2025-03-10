@@ -172,7 +172,7 @@ struct RunArgs : public argparse::Args {
       std::string name = net["name"];
       nets[name] = std::make_unique<Net>(name);
       auto *net_obj = nets[name].get();
-      for (auto &conn : net) {
+      for (auto &conn : net["connections"]) {
         std::string conn_name = conn.template get<std::string>();
         if (conn_name.find('.') != std::string::npos) {
           std::string left = conn_name.substr(0, conn_name.find('.'));
