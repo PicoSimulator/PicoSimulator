@@ -1,6 +1,7 @@
 #include "schema.hpp"
 
 #include <iostream>
+#include <string>
 
 bool schema_validate_config(const json &json)
 {
@@ -13,7 +14,7 @@ bool schema_validate_config(const json &json)
         "libraries"
     };
     for (auto &[key, _] : json.items()) {
-        const auto it = std::find(known_keys.begin(), known_keys.end(), key.template get<std::string>());
+        const auto it = std::find(known_keys.begin(), known_keys.end(), key);
         if (it == known_keys.end()) {
             std::cerr << "Unknown key \"" << key << "\" in \"config\"\n";
         }
