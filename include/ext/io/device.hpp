@@ -46,7 +46,7 @@ public:
   void ready() override
   {
     for (auto &[name, device] : m_sub_devices) {
-      device->ready();
+      std::get<0>(device)->ready();
     }
   }
 protected:
