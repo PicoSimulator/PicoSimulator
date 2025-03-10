@@ -1,5 +1,7 @@
 #include "schema.hpp"
 
+#include <iostream>
+
 bool schema_validate_config(const json &json)
 {
     if (!json.is_object()) {
@@ -24,7 +26,7 @@ bool schema_validate_config(const json &json)
         auto &envs = json["environments"];
         if (!envs.is_array()) {
             std::cerr << "\"config.environments\" must be an array!\n";
-            return false
+            return false;
         }
         for (auto &env : json["environments"]) {
 
