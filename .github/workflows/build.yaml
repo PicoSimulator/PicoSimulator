@@ -32,15 +32,19 @@ jobs:
           configurePreset: gcc_release
           buildPreset: gcc_release
           configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
-      - name: copy build artifacts
-        run: |
-          mkdir -p /build/
-          cp -r ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/app/picosim_app /build
-          cp -r ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/extlib/epdsim/libepdsim.so /build
+      - name: Build debug with cmake
+        uses: lukka/run-cmake@v10
+        with: 
+          cmakeListsTxtPath: ${{ENV.PRIVATE_PATH}}/CMakeLists.txt
+          configurePreset: gcc_debug
+          buildPreset: gcc_debug
+          configurePresetAdditionalArgs: "['-DCMAKE_C_COMPILER_LAUNCHER=ccache', '-DCMAKE_CXX_COMPILER_LAUNCHER=ccache']"
       - name: upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PicoSim Release Executables
           path: |
-            /build/picosim_app
-            /build/libepdsim.so
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/app/picosim_app
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_release/extlib/epdsim/libepdsim.so
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_debug/app/picosim_app
+            ${{ENV.PRIVATE_PATH}}/out/build/gcc_debug/extlib/epdsim/libepdsim.so
