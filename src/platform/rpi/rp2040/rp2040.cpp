@@ -460,7 +460,7 @@ PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){
       break;
     }
     case 0xd000'0044: { // GPIO_HI_OE_SET
-      for (int i = 0; i < 36 i++) 
+      for (int i = 0; i < 6; i++) 
         if (in & (1<<i)) m_sio_hi[i].get().set_oe(true); 
       break;
     }
