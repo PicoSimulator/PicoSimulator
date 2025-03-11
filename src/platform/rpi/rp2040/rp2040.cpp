@@ -326,16 +326,53 @@ PortState RP2040::RP2040::IOPort::read_word(uint32_t addr, uint32_t &out){
     {
       for (int i = 0; i < 30; i++) 
         out |= m_sio[i].get().get_input() << i; 
-      break;
-    }
+    } break;
     case 0xd000'0008: // force CS high to enable flash boot
     {
       for (int i = 0; i < 6; i++) 
         out |= m_sio_hi[i].get().get_input() << i; 
+    } break;
+    case 0xd000'0010: // GPIO_OUT
+    {
+      for (int i = 0; i < 30; i++) 
+        out |= m_sio[i].get().get_output() << i; 
+    } break;   
+    case 0xd000'0014: // GPIO_OUT_SET (WO)
+    case 0xd000'0018: // GPIO_OUT_CLR (WO)
+    case 0xd000'001c: // GPIO_OUT_XOR (WO)
       break;
-    }
-    case 0xd000'0050: out = m_tx_fifo.status_send() | m_rx_fifo.status_recv(); break;
-    // case 0xd000'0054: out = ; break;
+    case 0xd000'0020:
+    {
+      for (int i = 0; i < 30; i++) 
+        out |= m_sio[i].get().get_oe() << i; 
+    } break;    
+    case 0xd000'0024: // GPIO_OE_SET (WO)
+    case 0xd000'0028: // GPIO_OE_CLR (WO)
+    case 0xd000'002c: // GPIO_OE_XOR (WO)
+      break;
+    case 0xd000'0030: // GPIO_HI_OUT
+    {
+      for (int i = 0; i < 6; i++) 
+        out |= m_sio_hi[i].get().get_output() << i; 
+    } break;   
+    case 0xd000'0034: // GPIO_HI_OUT_SET (WO)
+    case 0xd000'0038: // GPIO_HI_OUT_CLR (WO)
+    case 0xd000'003c: // GPIO_HI_OUT_XOR (WO)
+      break;
+    case 0xd000'0040:
+    {
+      for (int i = 0; i < 6; i++) 
+        out |= m_sio_hi[i].get().get_oe() << i; 
+    } break;    
+    case 0xd000'0044: // GPIO_HI_OE_SET (WO)
+    case 0xd000'0048: // GPIO_HI_OE_CLR (WO)
+    case 0xd000'004c: // GPIO_HI_OE_XOR (WO)
+      break;
+    case 0xd000'0050: 
+      out = m_tx_fifo.status_send() 
+          | m_rx_fifo.status_recv();
+      break;
+    case 0xd000'0054: break;
     case 0xd000'0058: out = m_rx_fifo.recv(); break;
     case 0xd000'0060: out = m_divider.get_dividend(); break;
     case 0xd000'0064: out = m_divider.get_divisor(); break;
@@ -357,44 +394,84 @@ PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){
   #define SPINLOCKS_EVAL(num) case (0xd000'0100 + 4*num): m_spinlocks.unlock(num); break;
   switch(addr) {
     case 0xd000'0000: break;
-    case 0xd000'0010: {
+    case 0xd000'0010: { // GPIO_OUT
       for (int i = 0; i < 30; i++) 
         m_sio[i].get().set_output(in & (1<<i)); 
       break;
     }
-    case 0xd000'0014: {
+    case 0xd000'0014: { // GPIO_OUT_SET
       for (int i = 0; i < 30; i++) 
         if (in & (1<<i)) m_sio[i].get().set_output(true); 
       break;
     }
-    case 0xd000'0018: {
+    case 0xd000'0018: { // GPIO_OUT_CLR
       for (int i = 0; i < 30; i++) 
         if (in & (1<<i)) m_sio[i].get().set_output(false); 
       break;
     }
-    case 0xd000'001c: {
+    case 0xd000'001c: { // GPIO_OUT_XOR
       for (int i = 0; i < 30; i++) 
         if (in & (1<<i)) m_sio[i].get().set_output(!m_sio[i].get().get_output());
       break;
     }
-    case 0xd000'0020: {
+    case 0xd000'0020: { // GPIO_OE
       for (int i = 0; i < 30; i++) 
         m_sio[i].get().set_oe(in & (1<<i)); 
       break;
     }
-    case 0xd000'0024: {
+    case 0xd000'0024: { // GPIO_OE_SET
       for (int i = 0; i < 30; i++) 
         if (in & (1<<i)) m_sio[i].get().set_oe(true); 
       break;
     }
-    case 0xd000'0028: {
+    case 0xd000'0028: { // GPIO_OE_CLR
       for (int i = 0; i < 30; i++) 
         if (in & (1<<i)) m_sio[i].get().set_oe(false); 
       break;
     }
-    case 0xd000'0030: {
+    case 0xd000'002c: { // GPIO_OE_XOR
       for (int i = 0; i < 30; i++) 
         if (in & (1<<i)) m_sio[i].get().set_oe(!m_sio[i].get().get_output());
+      break;
+    }
+    case 0xd000'0030: { // GPIO_HI_OUT
+      for (int i = 0; i < 6; i++) 
+        m_sio_hi[i].get().set_output(in & (1<<i)); 
+      break;
+    }
+    case 0xd000'0034: { // GPIO_HI_OUT_SET
+      for (int i = 0; i < 6; i++) 
+        if (in & (1<<i)) m_sio_hi[i].get().set_output(true); 
+      break;
+    }
+    case 0xd000'0038: { // GPIO_HI_OUT_CLR
+      for (int i = 0; i < 6; i++) 
+        if (in & (1<<i)) m_sio_hi[i].get().set_output(false); 
+      break;
+    }
+    case 0xd000'003c: { // GPIO_HI_OUT_XOR
+      for (int i = 0; i < 6; i++) 
+        if (in & (1<<i)) m_sio_hi[i].get().set_output(!m_sio_hi[i].get().get_output());
+      break;
+    }
+    case 0xd000'0040: { // GPIO_HI_OE
+      for (int i = 0; i < 6; i++) 
+        m_sio_hi[i].get().set_oe(in & (1<<i)); 
+      break;
+    }
+    case 0xd000'0044: { // GPIO_HI_OE_SET
+      for (int i = 0; i < 36 i++) 
+        if (in & (1<<i)) m_sio_hi[i].get().set_oe(true); 
+      break;
+    }
+    case 0xd000'0048: { // GPIO_HI_OE_CLR
+      for (int i = 0; i < 6; i++) 
+        if (in & (1<<i)) m_sio_hi[i].get().set_oe(false); 
+      break;
+    }
+    case 0xd000'004c: { // GPIO_HI_OE_XOR
+      for (int i = 0; i < 6; i++) 
+        if (in & (1<<i)) m_sio_hi[i].get().set_oe(!m_sio_hi[i].get().get_output());
       break;
     }
     case 0xd000'0050: 
