@@ -24,6 +24,7 @@ protected:
   virtual PortState read_word_internal(uint32_t addr, uint32_t &out) override final
   {
     std::cerr << "I2C::read_word_internal(0x" << std::hex << addr << ")" << std::dec << std::endl;
+    out = 0;
     switch (addr & 0xff) {
     case 0x00: // IC_CON
     case 0x04: // IC_TAR  
@@ -35,7 +36,10 @@ protected:
     case 0x20: // IC_FS_SLC_LCNT  
     case 0x2c: // IC_INTR_STAT  
     case 0x30: // IC_INTR_MASK  
+      break;
     case 0x34: // IC_RAW_INTR_STAT  
+      out = 1<<4; // TX_EMPTY
+      break;
     case 0x38: // IC_RX_TL  
     case 0x3C: // IC_TX_TL  
     case 0x40: // IC_CLR_INTR  
