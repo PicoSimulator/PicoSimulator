@@ -217,6 +217,7 @@ struct RunArgs : public argparse::Args {
 struct ListArgs : public argparse::Args {
   bool &envs = flag("e,envs", "List available environments");
   bool &boards = flag("b,boards", "List available boards");
+  bool &libs = flag("l,libs", "List available libraries");
   int run() override{
     std::reference_wrapper<bool> args[] = {envs, boards};
     bool any = false;
@@ -234,7 +235,22 @@ struct ListArgs : public argparse::Args {
     if (envs) {
       std::cout << "Environments:" << std::endl;
       for (auto &env : config["environments"]) {
-        std::cout << "  " << env << std::endl;
+        std::cout << "  " << std::string{env["name"]} << std::endl;
+        std::cout << "    " << std::string{env["path"]} << std::endl;
+      }
+    }
+    if (boards) {
+      std::cout << "Boards:" << std::endl;
+      for (auto &board : config["boards"]) {
+        std::cout << "  " << std::string{board["name"]} << std::endl;
+        std::cout << "    " << std::string{board["path"]} << std::endl;
+      }
+    }
+    if (libs) {
+      std::cout << "Libraries:" << std::endl;
+      for (auto &lib : config["libraries"]) {
+        std::cout << "  " << std::string{lib["name"]} << std::endl;
+        std::cout << "    " << std::string{lib["path"]} << std::endl;
       }
     }
 
@@ -271,7 +287,7 @@ struct EnvCreateArgs : public argparse::Args {
     }
     {
       json cfg_env = {{"path", env_path/"env.json"}};
-      config["environments"][*name] = cfg_env;
+      config["environments"].push_back(cfg_env);
       save_config(config);
     }
     return 0;

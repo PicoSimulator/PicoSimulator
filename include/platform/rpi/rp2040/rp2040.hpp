@@ -125,6 +125,7 @@ namespace RP2040{
     void ready() override
     {
       m_rosc.start();
+      reset();
     }
   protected:
   private:
