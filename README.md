@@ -51,6 +51,20 @@ Peripheral configuration is likely to be a one-off event in execution and will b
 The UART is currently functional enough to provide output from the emulator. You can pass either a file or a PTY using `--uart0=/path/to/file`. This will either write the output of the UART to file or to a PTY of which the other end can be opened by minicom or similar serial port software.
 A PTY pair can be spun up using `socat -d -d pty,rawer,echo=0[,link=/symlink/file0] pty,rawer,echo=0[,link=/symlink/file1]`. Using symlinks allows the path to be consistent, as socat may create pty with any number.
 
+#### Interrupts
+
+ - [ ] Overrun Error
+ - [ ] Break Error
+ - [ ] Parity Error
+ - [ ] Framing Error
+ - [x] Recieve Timeout
+ - [x] Transmit interrupt
+ - [x] Recieve interrupt
+ - [ ] DSR Modem
+ - [ ] DCD Modem
+ - [ ] CTS Modem
+ - [ ] RI Modem
+
 ### SPI
 
 SPI is mostly functional. External devices can be connected to either hardware SPI interface or bitbanged pins. These external devices can be built-in or loaded from shared libraries.
