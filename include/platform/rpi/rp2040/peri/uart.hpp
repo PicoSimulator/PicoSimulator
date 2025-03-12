@@ -265,6 +265,8 @@ private:
             get_irq(IRQ::RX).raise();
           }
           m_shift_in_counter = wordlength();
+        } else {
+          m_infile.sync();
         }
       }
     } else if (m_shift_in_counter > 0) {
