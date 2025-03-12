@@ -81,6 +81,9 @@ protected:
       case UARTDR:
         if (!m_rx_fifo.empty()) {
           out = m_rx_fifo.pop();
+          if (m_rx_fifo.empty()) {
+            get_irq(IRQ::RT).lower();
+          }
         } else {
           out = 0;
           // m_status &= ~(1 << 4);
@@ -250,6 +253,7 @@ private:
       char c;
       if (m_infile.is_open()) {
         if (m_infile.readsome(&c, 1) == 1) {
+          m_rx_timeout = 0;
           // check for overrun
           if (!m_rx_fifo.full()) {
             m_rx_fifo.push(c);
@@ -270,8 +274,13 @@ private:
     } else if (m_shift_in_counter > 0) {
       m_shift_in_counter--;
     }
-    // std::cout << m_shift_in_counter << std::endl;;
-    // std::cout << m_shift_out_counter << std::endl;;
+    if (!m_rx_fifo.empty()) {
+      if (m_rx_timeout >= 32) {
+        get_irq(IRQ::RT).raise();
+      } else {
+        m_rx_timeout++;
+      }
+    }
   }
 
   uint8_t rx_fifo_threshold() const
@@ -323,6 +332,7 @@ private:
   Tracing::VCD::Register<uint8_t> m_char_in{"cin"};
 
   uint32_t m_uartifls;
+  uint32_t m_rx_timeout;
 
   InterruptSourceMulti m_irqs;
 
