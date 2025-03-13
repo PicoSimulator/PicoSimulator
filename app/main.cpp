@@ -29,6 +29,7 @@ void simulation_complete(){
   stream << "Emulation speed        : " << sim.current_time() / elapsed_seconds.count() / sim.from_seconds(1) * 100.0 << "% real time\n";
   stream << "EXITING" << std::endl;
   sim.abort();
+  sim.exit();
 }
 void my_handler(int s){
   simulation_complete();
@@ -208,7 +209,7 @@ struct RunArgs : public argparse::Args {
     g_start_time = std::chrono::high_resolution_clock::now();
   
     sim.run(max_ticks);
-    sim.exit();
+    simulation_complete();
 
     return 0;
   }

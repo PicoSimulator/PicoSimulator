@@ -86,8 +86,7 @@ private:
   };
   std::priority_queue<
     Event,
-    std::deque<Event>
-    // std::vector<Event>
+    std::vector<Event>
   > m_schedule;
   // simulation_time_t m_time;
   Tracing::VCD::Module m_nets{"NETS"};
