@@ -4,12 +4,13 @@
 #include <list>
 #include <vector>
 
-class IClockable {
+class IClockable : public ICallable {
 public:
 // Called on the rising edge of the clock
 virtual void tick() = 0;
 // Called on the falling edge of the clock
 virtual void tock(){};
+virtual void operator()() final override { tick(); }
 protected:
 private:
 };
