@@ -8,3 +8,4 @@ callgrind.*
 *.vcd
 boards/
 schema/
+firmwares/*

@@ -19,6 +19,10 @@ target_sources(${TARGET} PRIVATE
   platform/rpi/rp2040/pad.cpp
   platform/rpi/rp2040/gpio.cpp
   ext/io/net.cpp
+  usb/usbip_server.cpp
+  usb/host.cpp
+  usb/device.cpp
+  usb/common.cpp
 )
 
 target_include_directories(${TARGET} PRIVATE

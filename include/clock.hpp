@@ -3,8 +3,9 @@
 #include <cstdint>
 #include <list>
 #include <vector>
+#include "common/callable.hpp"
 
-class IClockable : public ICallable {
+class IClockable : public ICallable<void()> {
 public:
 // Called on the rising edge of the clock
 virtual void tick() = 0;

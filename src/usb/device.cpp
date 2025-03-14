@@ -10,11 +10,11 @@ void Device::send_packet(const uint8_t *data, uint16_t len_bits)
   }
 }
 
-void Device::send_data_packet(DataPid pid, const uint8_t *data, uint16_t len)
+void Device::send_data_packet(DataPID pid, const uint8_t *data, uint16_t len)
 {
   uint8_t buf[1025];
   uint16_t idx = 0;
-  buf[0] = reinterpret_cast<uint8_t>(pid);
+  buf[0] = static_cast<uint8_t>(pid);
   while (len--) {
     buf[idx+1] = data[idx];
     idx++;

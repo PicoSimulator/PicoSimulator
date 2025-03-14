@@ -22,7 +22,8 @@ public:
   typedef std::size_t tick_t;
   // 100ps per tick
   static Simulation &get();
-  static simulation_time_t long_wait = 
+  static constexpr simulation_time_t long_wait = 1000;
+  using Callable = ICallable<void()>;
 
 
   void run(simulation_time_t max_time) {
@@ -33,7 +34,8 @@ public:
       std::cerr << "Nothing to simulate!\n";
       return;
     }
-    while(m_time < max_time) {
+    m_max_time = max_time;
+    while(m_time < m_max_time) {
       auto &[time, c, period] = m_schedule.top();
       m_schedule.pop();
       m_time = time;
@@ -43,19 +45,19 @@ public:
     }
   }
   void abort() {
-    m_time = std::numeric_limits<simulation_time_t>::max();
+    m_max_time = 0;
   }
   void exit() {
     m_components.clear();
   }
   simulation_time_t current_time() const { return m_time; }
-  void schedule(simulation_time_t time, ICallable &c) {
+  void schedule(simulation_time_t time, Callable &c) {
     m_schedule.push({time, c, 0});
   }
-  void schedule_in(simulation_time_t time, ICallable &c) {
+  void schedule_in(simulation_time_t time, Callable &c) {
     m_schedule.push({m_time + time, c, 0});
   }
-  void schedule_periodic(simulation_time_t period, ICallable &c)
+  void schedule_periodic(simulation_time_t period, Callable &c)
   {
     m_schedule.push({m_time + period, c, period});
   }
@@ -83,7 +85,7 @@ private:
   }
   struct Event{
     simulation_time_t time;
-    std::reference_wrapper<ICallable> callable;
+    std::reference_wrapper<Callable> callable;
     simulation_time_t period;
     bool operator<(const Event &rhs) const {
       return time < rhs.time;
@@ -97,6 +99,7 @@ private:
   // simulation_time_t m_time;
   Tracing::VCD::Module m_nets{"NETS"};
   Tracing::VCD::Time<simulation_time_t> m_time{"Simulation_Time", 64};
+  simulation_time_t m_max_time;
   Tracing::VCD::VCDFile m_vcd;
   std::map<std::string, std::unique_ptr<IODevice>> m_components;
 };
