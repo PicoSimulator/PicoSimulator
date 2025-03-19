@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cassert>
 #include "common/interrupt.hpp"
+#include "common/debug.hpp"
 
 namespace ARMv6M
 {
@@ -84,12 +85,6 @@ namespace ARMv6M
       int8_t prio = current_priority();
       uint64_t bits = uint64_t(uint64_t(m_syshandlers.raised()) | (uint64_t(m_irqs.raised()) << 16));
       exception_bits pending_all = bits;
-      // if (bits){
-      //   std::cout << "pending_all:           " << pending_all << std::endl;
-      //   std::cout << "current_priority_mask: " << current_priority_mask() << std::endl;
-      //   std::cout << "current priority: " << int{prio} << std::endl;
-      //   std::terminate();
-      // }
       pending_all &= current_priority_mask();
       if (!pending_all.any())
         return ExceptionNumber::NONE;
@@ -155,13 +150,13 @@ namespace ARMv6M
         update_priority_masks(ExceptionNumber(i));
       }
       for (int i = -3; i <= 4; i++) {
-        std::cout << "Priority mask " << i << ": " << get_priority_mask(i) << std::endl;
+        debug_log() << "Priority mask " << i << ": " << get_priority_mask(i) << "\n";
       }
+      debug_log() << "Priority masks updated" << std::endl;
     }
     void update_priority_masks(ExceptionNumber num)
     {
       int8_t priority = get_exception_priority(num);
-      std::cout << "Updating priority masks for exception " << num << " with priority " << int(priority) << std::endl;
       for(int i = -3; i <= 4; i++) {
         if (priority < i && ((num<ExternalInterrupt)?true:(m_irqs_enabled & (1 << (num-ExternalInterrupt)))))
           get_priority_mask(i)[num] = true;

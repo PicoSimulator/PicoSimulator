@@ -102,9 +102,6 @@ namespace ARMv6M{
     void BLXWritePC(uint32_t target) { m_nextPC = target; }
     void BXWritePC(uint32_t target) { 
       if ((target & 0xf000'0000) == 0xf000'0000) {
-        std::cout << "BXWritePC: target = " << std::hex << target << std::dec << "\n";
-        // std::terminate();
-        // throw ARMv6M::HardFault{"Interworking exception returtn!"};
         m_interworking_required = true;
       }
       m_nextPC = target; 

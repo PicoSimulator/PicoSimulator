@@ -89,11 +89,11 @@ namespace BusRead{
           return true;
         }
         void await_suspend(std::coroutine_handle<> handle){
-          std::cout << "await suspend read_halfword" << std::endl;
+          // std::cout << "await suspend read_halfword" << std::endl;
           // handle.resume();
         }
         auto await_resume(){
-          std::cout << "await resume read_halfword" << std::endl;
+          // std::cout << "await resume read_halfword" << std::endl;
           port.read_halfword(addr, data);
           return data;
         }

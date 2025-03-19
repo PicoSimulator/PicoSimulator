@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ext/io/spidev.hpp"
+#include "common/debug.hpp"
 #include <array>
 #include <span>
 
@@ -61,7 +62,7 @@ public:
           for (size_t i = 0; i < m_erase_size; i ++) {
             m_flash[m_addr + i] = s_erased_byte_value;
           }
-          std::cout << "Erased " << std::hex << m_erase_size << " bytes at " << m_addr << std::dec << "\n";
+          debug_log() << "Erased " << std::hex << m_erase_size << " bytes at " << m_addr << std::dec << "\n";
         }
         if(spi_cs()) {
           spi_stop();
@@ -96,12 +97,12 @@ public:
         spi_start(&m_page_buffer[0], 256);
       } break;
       case State::PGM_DATA: {
-        std::cout << "Programming " << len << " bytes at " << std::hex << m_addr << "\n";
+        debug_log() << "Programming " << len << " bytes at " << std::hex << m_addr << "\n";
         for (size_t i = 0; i < len; i++) {
           m_flash[m_addr+i] &= data[i];
-          std::cout << std::hex << std::setfill('0') << std::setw(2) << int(m_flash[m_addr+i]) << " ";
+          debug_log() << std::hex << std::setfill('0') << std::setw(2) << int(m_flash[m_addr+i]) << " ";
         }
-        std::cout << std::dec << "\n";
+        debug_log() << std::dec << "\n";
         if(spi_cs()) {
           spi_stop();
         }
