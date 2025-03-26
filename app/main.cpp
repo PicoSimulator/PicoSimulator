@@ -235,7 +235,7 @@ struct ListArgs : public argparse::Args {
     }
 
     auto config = get_config();
-    std::array<std::tuple<bool, std::string, std::string>, 3> vars = {
+    std::vector<std::tuple<bool, std::string, std::string>> vars = {
       {envs, "environments", "Environments"},
       {boards, "boards", "Boards"},
       {libs, "libraries", "Libraries"},
