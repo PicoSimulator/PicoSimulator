@@ -221,7 +221,7 @@ struct ListArgs : public argparse::Args {
   bool &envs = flag("e,envs", "List available environments");
   bool &boards = flag("b,boards", "List available boards");
   bool &libs = flag("l,libs", "List available libraries");
-  bool &quiet = flag("q,quiet", "machine readable")
+  bool &quiet = flag("q,quiet", "machine readable");
   int run() override{
     std::reference_wrapper<bool> args[] = {envs, boards};
     bool any = false;
