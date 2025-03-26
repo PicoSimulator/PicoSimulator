@@ -8,6 +8,8 @@
 #include "loader.hpp"
 #include "schema.hpp"
 #include <filesystem>
+#include <array>
+#include <tuple>
 
 namespace fs = std::filesystem;
 
@@ -219,6 +221,7 @@ struct ListArgs : public argparse::Args {
   bool &envs = flag("e,envs", "List available environments");
   bool &boards = flag("b,boards", "List available boards");
   bool &libs = flag("l,libs", "List available libraries");
+  bool &quiet = flag("q,quiet", "machine readable")
   int run() override{
     std::reference_wrapper<bool> args[] = {envs, boards};
     bool any = false;
@@ -231,30 +234,26 @@ struct ListArgs : public argparse::Args {
       }
     }
 
-
     auto config = get_config();
-    if (envs) {
-      std::cout << "Environments:" << std::endl;
-      for (auto &env : config["environments"]) {
-        std::cout << "  " << std::string{env["name"]} << std::endl;
-        std::cout << "    " << std::string{env["path"]} << std::endl;
-      }
-    }
-    if (boards) {
-      std::cout << "Boards:" << std::endl;
-      for (auto &board : config["boards"]) {
-        std::cout << "  " << std::string{board["name"]} << std::endl;
-        std::cout << "    " << std::string{board["path"]} << std::endl;
-      }
-    }
-    if (libs) {
-      std::cout << "Libraries:" << std::endl;
-      for (auto &lib : config["libraries"]) {
-        std::cout << "  " << std::string{lib["name"]} << std::endl;
-        std::cout << "    " << std::string{lib["path"]} << std::endl;
-      }
-    }
+    std::array<std::tuple<bool, std::string, std::string>, 3> vars = {
+      {env, "environments", "Environments"},
+      {boards, "boards", "Boards"},
+      {libs, "libraries", "Libraries"},
+    };
 
+    for (auto &[b, s1, s2] : vars) {
+      if (b) {
+        if (!quiet)
+          std::cout << s2 << ":" << std::endl;
+        for (auto &obj : config[s1]) {
+          std::cout << "\t" << std::string{obj["name"]};
+          if (!quiet)
+            std::cout << "\n\t\t" << std::string{obj["path"]} << "\n";
+        }
+        if (quiet)
+          std::cout << "\n";
+      }
+    }
     return 0;
 
   }
