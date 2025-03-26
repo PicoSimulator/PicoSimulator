@@ -242,17 +242,16 @@ struct ListArgs : public argparse::Args {
     };
 
     for (auto &[b, s1, s2] : vars) {
-      if (b) {
+      if (!b) continue;
+      if (!quiet)
+        std::cout << s2 << ":" << std::endl;
+      for (auto &obj : config[s1]) {
+        std::cout << " " << std::string{obj["name"]};
         if (!quiet)
-          std::cout << s2 << ":" << std::endl;
-        for (auto &obj : config[s1]) {
-          std::cout << "\t" << std::string{obj["name"]};
-          if (!quiet)
-            std::cout << "\n\t\t" << std::string{obj["path"]} << "\n";
-        }
-        if (quiet)
-          std::cout << "\n";
+          std::cout << "\n  " << std::string{obj["path"]} << "\n";
       }
+      if (quiet)
+        std::cout << "\n";
     }
     return 0;
 
