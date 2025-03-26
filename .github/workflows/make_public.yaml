@@ -37,6 +37,7 @@ jobs:
           pushd ${{ENV.PRIVATE_PATH}}
             git rev-parse HEAD > ${{ENV.PUBLIC_PATH}}/git_hash
           popd
+          cp ${{ENV.PRIVATE_PATH}}/app/picosim_app_complete.sh ${{ENV.PUBLIC_PATH}}/picosim_app_complete.sh
       - name: git config
         run: |
           git -C ${{ENV.PUBLIC_PATH}} config user.email "skyler.mansfield.21@gmail.com"
