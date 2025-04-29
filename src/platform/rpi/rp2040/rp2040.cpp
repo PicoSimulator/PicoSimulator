@@ -127,7 +127,17 @@ RP2040::RP2040::RP2040()
   {1, m_fifo_10, m_fifo_01, ARR_REF(GPIOSignal, 30){ENUM_30(EVAL_SIO)}, ARR_REF(GPIOSignal, 6){ENUM_6(EVAL_SIO_HI)}}}
 , m_ROM{load_bootloader(BootloaderVersion::B2)}
 , m_bus_masters{m_cores[0].run(), m_cores[1].run()}
-, m_ahb_lite{m_DMA}
+, m_ahb_lite{
+  m_DMA,
+  {
+    m_interrupts.get_source(IRQ::PIO0_IRQ_0), 
+    m_interrupts.get_source(IRQ::PIO0_IRQ_1)
+  },
+  {
+    m_interrupts.get_source(IRQ::PIO1_IRQ_0), 
+    m_interrupts.get_source(IRQ::PIO1_IRQ_1)
+  },
+}
 , m_ahb{*this}
 , m_DMA{m_ahb, {
   /*DREQ_PIO0_TX0*/ m_null_dreq,

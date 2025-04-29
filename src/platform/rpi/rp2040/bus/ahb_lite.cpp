@@ -16,8 +16,8 @@ PortState AHBLite::read_word_internal(uint32_t addr, uint32_t &out) {
   switch(addr & 0x00f0'0000) {
     case 0x0000'0000: return m_dma.read_word(addr, out); break;
     case 0x0010'0000: out = 0x0000'0000; break;
-    case 0x0020'0000: out = 0x0000'0000; break;
-    case 0x0030'0000: out = 0x0000'0000; break;
+    case 0x0020'0000: return m_pio[0].read_word(addr, out); break;
+    case 0x0030'0000: return m_pio[1].read_word(addr, out); break;
     case 0x0040'0000: out = 0x0000'0000; break;
   }
   std::cout << "AHBLite::read_word_internal(" << std::hex << addr << ")" << std::endl;
@@ -28,8 +28,8 @@ PortState AHBLite::write_word_internal(uint32_t addr, uint32_t in) {
   switch(addr & 0x00f0'0000) {
     case 0x0000'0000: return m_dma.write_word(addr, in); break;
     case 0x0010'0000: ; break;
-    case 0x0020'0000: ; break;
-    case 0x0030'0000: ; break;
+    case 0x0020'0000: return m_pio[0].write_word(addr, in); break;
+    case 0x0030'0000: return m_pio[1].write_word(addr, in); break;
     case 0x0040'0000: ; break;
   }
   std::cout << "AHBLite::write_word_internal(" << std::hex << addr << ", " << in << ")" << std::endl;
