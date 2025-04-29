@@ -116,12 +116,12 @@ public:
     std::copy(data.begin(), data.end(), m_flash.begin());
   }
 
-  void load_file(const std::string &path)
+  bool load_file(const std::string &path)
   {
     std::ifstream file(path, std::ios::binary);
     if (!file) {
       std::cerr << "Failed to open file " << path << "\n";
-      return;
+      return false;
     }
     std::vector<uint8_t> data;
     file.seekg(0, std::ios::end);
@@ -129,6 +129,7 @@ public:
     file.seekg(0, std::ios::beg);
     file.read(reinterpret_cast<char *>(data.data()), data.size());
     load_binary_data(data);
+    return true;
   }
 
   bool set_param(const std::string &name, const std::string &value) override
@@ -136,14 +137,14 @@ public:
     if (name == "file") {
       m_file_path = value;
       load_file(value);
-      if (!m_load_file_path.empty())
-        load_file(m_load_file_path);
+      if (!m_load_file_path.empty()) {
+        return load_file(m_load_file_path);
+      }
       return true;
     }
     if (name == "load") {
       m_load_file_path = value;
-      load_file(value);
-      return true;
+      return load_file(value);
     }
     if (name == "save") {
       if (value == "true") {

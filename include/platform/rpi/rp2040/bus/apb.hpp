@@ -20,6 +20,7 @@
 #include "platform/rpi/rp2040/peri/i2c.hpp"
 #include "platform/rpi/rp2040/peri/rtc.hpp"
 #include "platform/rpi/rp2040/peri/dma/dreq.hpp"
+#include "platform/rpi/rp2040/peri/rosc.hpp"
 #include "async.hpp"
 
 #include <cassert>
@@ -144,5 +145,6 @@ namespace RP2040::Bus{
     SPI m_spi0, m_spi1;
     I2C m_i2c0, m_i2c1;
     RTC m_rtc;
+    ::RP2040::Peripheral::ROsc m_rosc;
   };
 }

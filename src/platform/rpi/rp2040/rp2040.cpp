@@ -393,7 +393,11 @@ PortState RP2040::RP2040::IOPort::write_word(uint32_t addr, uint32_t in){
   std::cout << "IOPort::write_word(" << std::hex << addr << ", " << in << std::dec << ")" << std::endl;
   #define SPINLOCKS_EVAL(num) case (0xd000'0100 + 4*num): m_spinlocks.unlock(num); break;
   switch(addr) {
-    case 0xd000'0000: break;
+    case 0xd000'0000: 
+    case 0xd000'0004: 
+    case 0xd000'0008: 
+    case 0xd000'000c: 
+      break;
     case 0xd000'0010: { // GPIO_OUT
       for (int i = 0; i < 30; i++) 
         m_sio[i].get().set_output(in & (1<<i)); 
