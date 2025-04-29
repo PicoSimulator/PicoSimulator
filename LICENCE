@@ -1,4 +1,4 @@
-Custom License: Personal & Educational Use Only (v1.1)
+Custom License: Personal & Educational Use Only (v1.2)
 
 Copyright (c) [2024-2025] [Skyler Mansfield]
 
@@ -19,6 +19,16 @@ Permission is hereby granted, free of charge, to any person obtaining a copy of 
 
 4.  License Retention
     This license and copyright notice must be retained in all copies or substantial portions of the Software, including in modified versions. 
+
+5.  Attribution Requirement
+    Any distribution of the Software, including modified versions, must include a clear and visible attribution to the original author. This must include:
+    - The original author’s name: Skyler Mansfield
+    - A link to the original source repository or website: https://github.com/PicoSimulator/PicoSimulator
+    - A statement such as: “Original software by Skyler Mansfield, used under license.”
+
+6.  Example Usage Disclosure
+    The original author reserves the right to publicly reference and showcase any non-commercial use of this Software as examples or case studies (e.g. in documentation, presentations, websites, or promotional materials).
+    This clause does not apply to commercial users, whose usage is considered private unless otherwise agreed.
 
 
 By using the Software, you agree to these terms.
