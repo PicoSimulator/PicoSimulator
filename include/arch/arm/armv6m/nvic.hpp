@@ -55,11 +55,15 @@ namespace ARMv6M
     int8_t current_priority() const {
       return m_current_priority;
     }
+    void set_current_priority(int8_t prio) {
+      m_current_priority = prio;
+      m_current_prio_mask = get_priority_mask(current_priority());
+    }
     const exception_bits &get_priority_mask(int8_t priority) const {
       return m_priority_masks[priority+3];
     }
     const exception_bits &current_priority_mask() const {
-      return get_priority_mask(current_priority());
+      return m_current_prio_mask;
     }
     void setExceptionActive(ExceptionNumber num, bool active) {
       if(num)
@@ -70,31 +74,21 @@ namespace ARMv6M
         else
           m_syshandlers.clear_pending(1 << num);
       }
-      // if(active)
-      //   m_current_exception = num;
-      // else
-      //   m_current_exception = 
-      m_current_priority = ExecutionPriority();
+      
+      set_current_priority(ExecutionPriority());
     }
     auto ExceptionActiveBitCount() const {
       return m_active_exceptions.count();
     }
 
     ExceptionNumber check_pending() const {
-      int8_t prio = current_priority();
       uint64_t bits = uint64_t(uint64_t(m_syshandlers.raised()) | (uint64_t(m_irqs.raised()) << 16));
       exception_bits pending_all = bits;
-      // if (bits){
-      //   std::cout << "pending_all:           " << pending_all << std::endl;
-      //   std::cout << "current_priority_mask: " << current_priority_mask() << std::endl;
-      //   std::cout << "current priority: " << int{prio} << std::endl;
-      //   std::terminate();
-      // }
       pending_all &= current_priority_mask();
       if (!pending_all.any())
         return ExceptionNumber::NONE;
       for(int i = 0; i < 48; i++){
-        if (pending_all[i] && m_priority_masks[prio][i])
+        if (pending_all[i])
           return ExceptionNumber(i);
       }
       assert(false); // should never get here
@@ -168,6 +162,7 @@ namespace ARMv6M
         else
           get_priority_mask(i)[num] = false;
       }
+      set_current_priority(current_priority());
     }
 
     uint32_t m_vtor;
@@ -179,8 +174,8 @@ namespace ARMv6M
 
     exception_bits m_priority_masks[8];
     exception_bits m_active_exceptions;
-
     exception_bits m_current_prio_mask;
+
     bool m_primask;
     int8_t m_current_priority;
   };
