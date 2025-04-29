@@ -13,10 +13,10 @@ jobs:
     env:
       PRIVATE_PATH: ${{github.workspace}}
     steps:
-      - name: Checkout private repo
+      - name: Checkout repo
         uses: actions/checkout@v2
         with:
-          repository: PicoSimulator/PicoSimulator-private
+          repository: PicoSimulator/PicoSimulator
           path: ${{ ENV.PRIVATE_PATH }}
           submodules: true
       - name: Install dependencies
