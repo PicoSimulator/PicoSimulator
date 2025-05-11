@@ -2,7 +2,7 @@
 
 #include <exception>
 #include <string>
-#include <format>
+// #include <format>
 
 namespace ARMv6M{
   class HardFault : public std::exception{
@@ -16,7 +16,8 @@ namespace ARMv6M{
   class BusFault : public HardFault{
   public:
     BusFault() : HardFault{"BusFault -> HardFault"}{}
-    BusFault(uint32_t addr) : HardFault{std::format("BusFault({:x}) -> HardFault" ,addr)}{}
+    // BusFault(uint32_t addr) : HardFault{std::format("BusFault({:x}) -> HardFault" ,addr)}{}
+    BusFault(uint32_t addr) : HardFault{"BusFault(" + std::to_string(addr)+ ") -> HardFault"}{}
   protected:
   private:
   };

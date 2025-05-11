@@ -1,7 +1,7 @@
 #include "tracing/vcd.hpp"
 #include "simulation.hpp"
 #include <stdexcept>
-#include <format>
+// #include <format>
 
 using namespace Tracing::VCD;
 
@@ -19,7 +19,8 @@ Item &Module::get(const std::string &key) {
       return item.get();
     }
   }
-  throw std::runtime_error(std::format("Child {} does not exist for {}", key, get_name()));
+  // throw std::runtime_error(std::format("Child {} does not exist for {}", key, get_name()));
+  throw std::runtime_error("Child " + key + " does not exist for" + get_name());
 }
 
 void VCDFile::check_time() {
