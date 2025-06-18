@@ -11,7 +11,8 @@ using drive_strength_t = uint8_t;
 class DriveStrength{
 public:
   DriveStrength impede(unsigned long resistance) {
-
+    __builtin_unreachable();
+    // Placeholder for future implementation.
   }
 protected:
 private:

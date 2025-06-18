@@ -23,9 +23,11 @@ endif()
 
 set(TARGET picosim)
 add_library(${TARGET} STATIC)
-target_compile_definitions(${TARGET} PRIVATE
-  config_VCD_TRACE_ENABLED=$CACHE{TRACE_ENABLED}
-)
+if (DEFINED CACHE{TRACE_ENABLED})
+  target_compile_definitions(${TARGET} PRIVATE
+    config_VCD_TRACE_ENABLED=$CACHE{TRACE_ENABLED}
+  )
+endif()
 target_compile_options(${TARGET} PRIVATE 
   -std=c++20 
   -fcoroutines
