@@ -16,6 +16,7 @@ target_sources(${TARGET} PRIVATE
   platform/rpi/rp2040/peri/clocks.cpp
   platform/rpi/rp2040/peri/dma/dma.cpp
   platform/rpi/rp2040/peri/dma/dreq.cpp
+  platform/rpi/rp2040/peri/pio/pio.cpp
   platform/rpi/rp2040/pad.cpp
   platform/rpi/rp2040/gpio.cpp
   ext/io/net.cpp

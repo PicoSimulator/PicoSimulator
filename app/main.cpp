@@ -13,6 +13,27 @@
 
 namespace fs = std::filesystem;
 
+struct ListArgs : public argparse::Args {
+  int run() override {
+    // Configs
+    // Boards
+    // Devices
+  }
+};
+
+struct MyArgs : public argparse::Args {
+  std::string &binary = arg("flash_binary", "Path to binary file to load into flash");
+  std::optional<std::string> &uart0 = kwarg("uart0", "Path to UART0 file, can be PTY");
+  unsigned long long &max_ticks = kwarg("max_ticks", "Number of ticks to run").set_default(std::numeric_limits<unsigned long long>::max());
+  bool &core0_trace = kwarg("core0.trace", "Enable trace for core 0").set_default(false);
+  bool &core1_trace = kwarg("core1.trace", "Enable trace for core 1").set_default(false);
+  bool &core1_enable = kwarg("core1.enable", "Enable core 1").set_default(false);
+  bool &epd3in7 = flag("epd3in7", "Enable Waveshare EPD 3.7in display");
+  std::optional<std::string> &trace_file = kwarg("trace_file", "Path to trace file");
+  std::vector<std::string> &trace_enables = kwarg("trace_enable", "Enable trace for named item");
+  std::vector<std::string> &trace_disables = kwarg("trace_disable", "Disable trace for named item");
+};
+
 
 std::chrono::time_point<std::chrono::high_resolution_clock> g_start_time;
 
